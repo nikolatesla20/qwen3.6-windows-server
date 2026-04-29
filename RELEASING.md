@@ -1,12 +1,26 @@
 # Releasing a new launcher zip
 
-End-to-end automated. **One-time setup:**
+End-to-end automated.
 
-If `devnen/vllm-windows` is private, the build step needs a token that
-can read its release assets. Create a fine-grained PAT with `Contents:
-read` on that repo and add it as a repository secret named
-`WHEEL_RELEASE_TOKEN`. If `devnen/vllm-windows` is public, no setup is
-needed — `${{ secrets.GITHUB_TOKEN }}` suffices.
+## One-time setup (REQUIRED while `devnen/vllm-windows` is private)
+
+The release workflow downloads the patched wheel from the
+`devnen/vllm-windows` release assets. The default `GITHUB_TOKEN` cannot
+read another private repo, so create a fine-grained PAT:
+
+1. Go to <https://github.com/settings/personal-access-tokens/new>.
+2. Token name: `qwen36-windows-server-wheel-read`. Expiration: pick something reasonable.
+3. Resource owner: `devnen`.
+4. Repository access: *Only select repositories* → pick `devnen/vllm-windows`.
+5. Repository permissions → **Contents: Read-only**. (Nothing else.)
+6. Generate, copy the `github_pat_…` value.
+7. In `devnen/qwen3.6-windows-server` → *Settings → Secrets and variables → Actions → New repository secret*:
+   - Name: `WHEEL_RELEASE_TOKEN`
+   - Value: the PAT.
+
+Once `devnen/vllm-windows` is made public, this PAT is no longer
+needed — the workflow falls back to `${{ secrets.GITHUB_TOKEN }}`
+automatically.
 
 ## Release flow
 
