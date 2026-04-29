@@ -25,9 +25,13 @@ from textual.containers import Horizontal
 from textual.widgets import Button
 
 
+import os as _os
+
+_ENABLE_LINUX = _os.environ.get("VLLM_WINDOWS_ENABLE_LINUX", "").lower() in ("1", "true", "yes", "on")
+
 TABS: tuple[tuple[str, str], ...] = (
     ("windows", "Windows"),
-    ("linux", "Linux"),
+    *((("linux", "Linux"),) if _ENABLE_LINUX else ()),
 )
 
 

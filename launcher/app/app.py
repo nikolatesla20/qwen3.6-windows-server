@@ -21,8 +21,8 @@ if _ENABLE_LINUX:
 
 
 class LauncherApp(App):
-    TITLE = "vLLM Launcher"
-    SUB_TITLE = "Qwen3.6-27B AutoRound · 2× RTX 3090"
+    TITLE = "Qwen3.6 Windows Server"
+    SUB_TITLE = "Qwen3.6-27B AutoRound INT4 · native Windows · no WSL"
 
     BINDINGS = [
         Binding("ctrl+w", "launch_web", "Web UI", show=True),
