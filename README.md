@@ -29,6 +29,7 @@ On a single RTX 3090 (24 GB), running [Lorbus AutoRound INT4](https://huggingfac
 
 | Snapshot              | Decode tok/s | Prompt class      | Context | Use it when |
 |-----------------------|--------------|-------------------|---------|-------------|
+| `start_toolcall`      | parser-pinned | tool-calling apps | 64 k    | **Agentic / tool-calling apps** (Cline, Cursor, Codex CLI, OpenWebUI). Patched parsers (PR #35687 + #40861) + `qwen3.5-enhanced.jinja` + `preserve_thinking=false`. Verified 8/8 on `windows_tools\test_toolcall.py`. Port 5005. |
 | `start_72tps`         | **~72**      | short (~200 tok)  | 32 k    | Short-prompt / chat baseline. MTP n=3. |
 | `start_speed`         | **64.5**     | long (100 KB)     | 90 k    | Default for long prompts. MTP n=6 — see note below. |
 | `start_127k`          | 53.4         | long (100 KB)     | 127 k   | Maximum context on a single 3090. |

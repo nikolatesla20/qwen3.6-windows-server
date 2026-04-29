@@ -49,3 +49,23 @@ LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 def log_path_for(port: int) -> Path:
     return LOGS_DIR / f"vllm_server.{port}.log"
+
+
+# Path to the vendored Qwen3.5 enhanced jinja chat template. Lives under
+# the vllm-windows repo (next to the patched wheel source). End-user
+# portable installs symlink/copy it into ${VLLM_WINDOWS_TEMPLATES} so
+# launcher zips can stand alone.
+def enhanced_jinja_path() -> Path:
+    env = os.environ.get("VLLM_WINDOWS_ENHANCED_JINJA")
+    if env and Path(env).exists():
+        return Path(env)
+    candidates = [
+        REPO_ROOT / "templates" / "qwen3.5-enhanced.jinja",
+        REPO_ROOT.parent / "vllm-windows" / "templates" / "qwen3.5-enhanced.jinja",
+    ]
+    for p in candidates:
+        if p.exists():
+            return p
+    # Last resort — return the most likely portable layout (launcher next
+    # to vllm-windows). Caller will print an error if it doesn't exist.
+    return candidates[0]

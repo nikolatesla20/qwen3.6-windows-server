@@ -8,6 +8,7 @@ the venv via `%VLLM_WINDOWS_VENV%` and launches the corresponding `.py`.
 
 | Snapshot | Decode tok/s | Ctx | When |
 |---|---|---|---|
+| `start_toolcall`  | n/a (parser-pinned)    | 64 k  | **Tool calling / agentic apps.** Pairs the patched wheel (PR #35687 + #40861) with `qwen3.5-enhanced.jinja` and `preserve_thinking=false`. Verified 8/8 on `windows_tools\test_toolcall.py`. Port 5005. |
 | `start_speed`     | **64.5** (long prompt) | 90 k  | Default for daily use. MTP n=6, GPU1, 350 W. |
 | `start_127k`      | 53.4                   | 127 k | When you need the largest single-GPU ctx. MTP n=3. |
 | `start_mtp4`      | 58.3                   | 120 k | Mid-balance speed vs ctx. |

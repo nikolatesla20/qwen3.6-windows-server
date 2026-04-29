@@ -24,6 +24,38 @@ windows:
     bench_max_tokens: 200
 
   configs:
+    - id: toolcall
+      tagline: Tool-calling fixed (PR#35687 + PR#40861 + enhanced.jinja)
+      tier: active
+      status: recommended
+      bat: '${SNAPSHOTS_DIR}\start_toolcall.bat'
+      py:  '${SNAPSHOTS_DIR}\start_toolcall.py'
+      gpu: GPU1
+      tp: 1
+      pp: 1
+      mem_util: 0.948
+      mtp_n: 3
+      ctx: 64000
+      port: 5005
+      decode_tps: null
+      prefill_tps_cold: null
+      notes: |
+        Agentic / tool-calling default. Pairs the patched 0.19 wheel
+        (#35687 reasoning-parser fix + #40861 qwen3_coder/qwen3_xml
+        streaming fixes — see windows_patches/ in vllm-windows) with the
+        qwen3.5-enhanced.jinja chat template (vendored at templates/)
+        and preserve_thinking=false.
+
+        Verified 8/8 on windows_tools\test_toolcall.py (simple call,
+        special chars in args, CoT leakage, multi-turn, streaming
+        parity, structural delimiter literals in arg values, parallel
+        calls, 5-round agentic chain).
+
+        Point your AI chat app / harness (Cline, Cursor, Codex
+        CLI, OpenWebUI) at http://127.0.0.1:5005/v1. Request-side,
+        prefer temperature=0.1 — tool calling on Qwen 3.6 falls apart
+        at the default 0.7-0.9.
+
     - id: speed
       tagline: Speed king — peak decode
       tier: active
