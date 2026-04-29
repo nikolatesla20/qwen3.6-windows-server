@@ -27,18 +27,28 @@ ships inside the launcher zip.
 
 On a single RTX 3090 (24 GB), running [Lorbus AutoRound INT4](https://huggingface.co/Lorbus/Qwen3.6-27B-int4-AutoRound):
 
-| Snapshot              | Decode tok/s | Context | Use it when |
-|-----------------------|--------------|---------|-------------|
-| `start_speed`         | **64.5**     | 90 k    | Default. Long prompts, MTP n=6 sweet spot. |
-| `start_127k`          | 53.4         | 127 k   | Maximum context on a single 3090. |
-| `start_mtp4`          | 58.3         | 120 k   | Mid-balance speed vs context. |
-| `start_72tps`         | ~72 (short)  | 32 k    | Short-prompt baseline. |
-| `start_pp2_160k` (2 GPU) | 43.5      | 160 k   | Pipeline-parallel for the largest contexts. |
-| `start_gpu0_50k`      | volatile     | 9–50 k  | Single-GPU, monitor plugged into the same card. |
+| Snapshot              | Decode tok/s | Prompt class      | Context | Use it when |
+|-----------------------|--------------|-------------------|---------|-------------|
+| `start_72tps`         | **~72**      | short (~200 tok)  | 32 k    | Short-prompt / chat baseline. MTP n=3. |
+| `start_speed`         | **64.5**     | long (100 KB)     | 90 k    | Default for long prompts. MTP n=6 — see note below. |
+| `start_127k`          | 53.4         | long (100 KB)     | 127 k   | Maximum context on a single 3090. |
+| `start_mtp4`          | 58.3         | long (100 KB)     | 120 k   | Mid-balance speed vs context. |
+| `start_pp2_160k` (2 GPU) | 43.5      | long (100 KB)     | 160 k   | Pipeline-parallel for the largest contexts. |
+| `start_gpu0_50k`      | volatile     | mixed             | 9–50 k  | Single-GPU, monitor plugged into the same card. |
 
-All numbers measured on a 24 KB / ~24 k-token Python source-summary
-prompt, [coherence-validated](docs/COHERENCE.md) — TPS without coherence
-is a lie.
+Long-prompt rows were measured on a ~100 KB / ~24 k-token Python
+source-summary prompt (a real Windows-service module fed to
+`windows_tools\bench_summarize.py`). The short-prompt row was measured
+on a ~200-token chat turn via `windows_tools\bench.py`. All numbers
+[coherence-validated](docs/COHERENCE.md) — TPS without coherence is a
+lie.
+
+> **Why MTP n=6 on `start_speed`?** n=3 is the universal *short-prompt*
+> sweet spot and ships as `start_72tps`. On long, dense Python source
+> the acceptance curve shifts later — n=6 won our coherence sweep
+> (n=3 / 4 / 5 / 6 / 7 / 8 → 53.4 / 58.3 / 62.8 / 64.5 / 61.5 / 58.0
+> tok/s; full sweep in [`docs/TUNING.md`](docs/TUNING.md)). Always
+> re-sweep on a representative prompt for your workload.
 
 > **Honest framing:** these are not r/LocalLLaMA records. Community has
 > hit 80–82 tok/s on a 3090 with TurboQuant 3-bit KV, and 160 tok/s on a
@@ -100,7 +110,7 @@ For benchmark numbers like the table above, use the bundled tools:
 
 ```powershell
 windows_tools\bench.bat              :: short prompt, decode-only TPS
-windows_tools\bench_summarize.bat    :: 24 k-token prompt, prefill + decode + KV
+windows_tools\bench_summarize.bat    :: ~100 KB / ~24 k-token prompt, prefill + decode + KV
 windows_tools\check_coherence.bat    :: 3-tier coherence validator
 ```
 

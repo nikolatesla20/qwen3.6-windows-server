@@ -1,15 +1,18 @@
 """Sample long-prompt source for bench_summarize.py.
 
-The skill's headline numbers came from feeding a ~24 k-token Python service
-file to the summarisation prompt. To reproduce them you need a comparably
-sized, dense Python source. Three options:
+The headline numbers in this repo's snapshot table came from feeding a
+real ~100 KB / ~24 k-token Python "Windows service" source file to the
+summarisation prompt. That file is private (proprietary code), so it is
+not checked in. To reproduce the headline numbers you need a comparably
+sized, dense Python source of your own. Three options:
 
 1. **Use this file with --code** — but it's a placeholder; the numbers
-   will be small.
+   will be artificially fast because the prompt is short.
 
-2. **Use CPython's Lib/inspect.py** (PSF-licensed, compatible). Roughly
-   8–10 k tokens. Works fine for relative comparisons but not directly
-   comparable to the 24 k headline:
+2. **Use CPython's Lib/inspect.py** (PSF-licensed, redistributable).
+   Roughly 8–10 k tokens. Good for relative comparisons but ~3× shorter
+   than the 100 KB headline prompt, so absolute numbers will be higher
+   than ours:
    ```
    python windows_tools\\bench_summarize.py --label test \\
        --code .venv\\Lib\\inspect.py

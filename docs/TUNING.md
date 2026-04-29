@@ -7,8 +7,8 @@ KV, FlashInfer, and a few Genesis patches are unavailable. What remains:
 
 1. **MTP num_speculative_tokens.** The Reddit "n=3 is the sweet spot"
    conventional wisdom is for *short prompts*. On long-prompt dense code
-   (24 k tokens of Python source, our bench harness) the acceptance curve
-   shifts later:
+   (~100 KB / ~24 k tokens of Python source, our bench harness) the
+   acceptance curve shifts later:
    ```
    n=3 / 4 / 5 / 6 / 7 / 8  →  53.4 / 58.3 / 62.8 / 64.5 / 61.5 / 58.0 tok/s
    ```
@@ -57,7 +57,7 @@ KV, FlashInfer, and a few Genesis patches are unavailable. What remains:
 1. **Just raise `--max-model-len`.** On a fresh `start_72tps` snapshot the
    KV pool already holds ~75 k tokens of physical KV but `--max-model-len=32000`
    caps it at 32 k. Bumping to 121 k costs nothing (measured: prefill 845 vs
-   835 tok/s, decode within noise on a 24 k-token bench prompt). The 32 k
+   835 tok/s, decode within noise on the ~25 k-token bench prompt). The 32 k
    conservatism is a copy-from-Linux artifact, not a hardware limit.
 
 2. **GPU1 mem-util ceiling is 0.948** (display-free). When GPU0 is idle,
@@ -100,8 +100,9 @@ error described above — read it, set max-model-len just under, re-launch.
 
 ## Sweeping your own configs
 
-`windows_tools\bench_summarize.py` runs a 24 k-token Python source-summary
-prompt against any port and appends one TSV row per run to `runs.tsv`.
+`windows_tools\bench_summarize.py` runs a ~100 KB / ~24 k-token Python
+source-summary prompt against any port and appends one TSV row per run
+to `runs.tsv`.
 Schema:
 
 ```
@@ -109,8 +110,9 @@ label  kv_pool_GiB  ctx  mtp_n  prefill_tok_s  decode_tok_s  ttft_s  wall_tok_s 
 ```
 
 Convention: cold rows labeled `<config>`, warm rerun rows `<config>_run2`,
-`<config>_run3`. Cold runs hit fresh prefix cache (TTFT ~25 s on 24 k-token
-prompts); warm runs report TTFT ~4 s / prefill ~5 900 tok/s — that warm
+`<config>_run3`. Cold runs hit fresh prefix cache (TTFT ~25 s on the
+~25 k-token prompt); warm runs report TTFT ~4 s / prefill ~5 900 tok/s
+— that warm
 prefill is *bogus* for cross-config comparison. Decode TPS *is* meaningful
 on warm runs and useful for run-to-run noise.
 
