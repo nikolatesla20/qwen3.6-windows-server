@@ -20,7 +20,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 # Reuse the existing Windows vLLM install so this folder stays rollbackable.
-from _common import VENV, VLLM_EXE, MODEL_PATH, VCVARS, log_path_for
+from _common import VENV, VLLM_EXE, MODEL_PATH, VCVARS, log_path_for, enhanced_jinja_path
 SERVED_NAME = "qwen3.6-27b-autoround"
 HOST = "0.0.0.0"
 PORT = 5001  # different from vllm-windows (5000), so both can coexist if needed
@@ -94,6 +94,10 @@ def main() -> int:
     # Overlay MSVC dev env so FlashInfer can JIT-compile kernels (needed for
     # fp8 KV cache which triggers a new prefill kernel build at first request).
     env.update(msvc_env())
+    ENHANCED_JINJA = enhanced_jinja_path()
+    if not Path(ENHANCED_JINJA).exists():
+        print(f"[ERROR] enhanced jinja template not found: {ENHANCED_JINJA}", file=sys.stderr)
+        return 1
     _world = TP * PP
     # GPU1 only when single-card (leaves GPU0 free for display/other work);
     # both cards when TP/PP > 1.
@@ -130,6 +134,8 @@ def main() -> int:
         "--enable-auto-tool-choice",
         "--tool-call-parser=qwen3_coder",
         "--reasoning-parser=qwen3",
+        f"--chat-template={ENHANCED_JINJA}",
+        '--default-chat-template-kwargs={"preserve_thinking": false}',
         f"--kv-cache-dtype={KV_CACHE_DTYPE}",
         f"--tensor-parallel-size={TP}",
         f"--pipeline-parallel-size={PP}",

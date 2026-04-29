@@ -24,7 +24,7 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-from _common import VENV, VLLM_EXE, MODEL_PATH, VCVARS, log_path_for
+from _common import VENV, VLLM_EXE, MODEL_PATH, VCVARS, log_path_for, enhanced_jinja_path
 SERVED_NAME = "qwen3.6-27b-autoround"
 HOST = "0.0.0.0"
 PORT = 5002  # baseline 72-tok/s server owns 5001
@@ -89,6 +89,10 @@ def main() -> int:
 
     env = os.environ.copy()
     env.update(msvc_env())
+    ENHANCED_JINJA = enhanced_jinja_path()
+    if not Path(ENHANCED_JINJA).exists():
+        print(f"[ERROR] enhanced jinja template not found: {ENHANCED_JINJA}", file=sys.stderr)
+        return 1
     env["CUDA_VISIBLE_DEVICES"] = "0,1"
     env["VLLM_SLEEP_WHEN_IDLE"] = "1"
     env["VLLM_ENABLE_CUDAGRAPH_GC"] = "1"
@@ -120,6 +124,8 @@ def main() -> int:
         "--enable-auto-tool-choice",
         "--tool-call-parser=qwen3_coder",
         "--reasoning-parser=qwen3",
+        f"--chat-template={ENHANCED_JINJA}",
+        '--default-chat-template-kwargs={"preserve_thinking": false}',
         f"--kv-cache-dtype={KV_CACHE_DTYPE}",
         f"--tensor-parallel-size={TP}",
         f"--pipeline-parallel-size={PP}",
