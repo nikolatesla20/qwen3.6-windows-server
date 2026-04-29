@@ -1,0 +1,144 @@
+name: Release portable launcher
+
+# Triggers:
+#   - push of a tag matching v* -> auto-release.
+#   - workflow_dispatch -> Run workflow from the Actions UI.
+#
+# The job:
+#   - Pulls the latest devnen/vllm-windows wheel from its GitHub
+#     Release (or a specific URL via dispatch input).
+#   - Builds the portable launcher zip via windows_tools/build_launcher_zip.py
+#     with --wheel pointing at the downloaded wheel.
+#   - Computes SHA256SUMS.txt.
+#   - Creates a GitHub Release with the zip + sums attached. Notes are
+#     read from dist/RELEASE_NOTES.md when present.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Git tag to create/release against (e.g. v0.1.1). Required for workflow_dispatch.'
+        required: false
+        type: string
+      wheel_url:
+        description: 'Override URL to a specific patched vllm wheel. Defaults to latest from devnen/vllm-windows.'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Resolve release tag
+        id: vars
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "push" ]; then
+            REL="${GITHUB_REF#refs/tags/}"
+          else
+            REL="${{ inputs.release_tag }}"
+            if [ -z "$REL" ]; then
+              echo "::error::release_tag input is required for workflow_dispatch"; exit 1
+            fi
+          fi
+          echo "release_tag=$REL" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve wheel URL
+        id: wheel
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.WHEEL_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          override='${{ inputs.wheel_url }}'
+          if [ -n "$override" ]; then
+            URL="$override"
+          else
+            URL=$(gh release view --repo devnen/vllm-windows --json assets \
+                  -q '.assets[] | select(.name | endswith(".whl")) | .url' \
+                  | head -n1)
+          fi
+          if [ -z "$URL" ]; then
+            echo "::error::No wheel URL resolved. Set inputs.wheel_url or ensure devnen/vllm-windows has a .whl asset on its latest release."
+            exit 1
+          fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Using wheel: $URL"
+
+      - name: Download wheel
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.WHEEL_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          URL='${{ steps.wheel.outputs.url }}'
+          # Use gh api for private-repo asset downloads; falls back to curl for public URLs.
+          if [[ "$URL" == https://api.github.com/* ]]; then
+            gh api "$URL" -H "Accept: application/octet-stream" > vllm.whl
+          else
+            curl -sSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/octet-stream" "$URL" -o vllm.whl
+          fi
+          ls -lh vllm.whl
+
+      - name: Build portable launcher zip
+        shell: bash
+        run: |
+          python windows_tools/build_launcher_zip.py --wheel vllm.whl
+
+      - name: Generate SHA256SUMS.txt
+        shell: bash
+        run: |
+          cd dist
+          python -c "
+          import hashlib, pathlib
+          for p in sorted(pathlib.Path('.').glob('*.zip')):
+              print(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}')
+          " > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Resolve release notes
+        id: notes
+        shell: bash
+        run: |
+          if [ -f dist/RELEASE_NOTES.md ]; then
+            echo "path=dist/RELEASE_NOTES.md" >> "$GITHUB_OUTPUT"
+          else
+            echo "Portable Qwen3.6-27B launcher for Windows. See repo README for what's inside." > /tmp/notes.md
+            echo "path=/tmp/notes.md" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create / update GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          REL='${{ steps.vars.outputs.release_tag }}'
+          if ! git rev-parse "refs/tags/$REL" >/dev/null 2>&1; then
+            git tag "$REL"
+            git push origin "$REL" || true
+          fi
+          if gh release view "$REL" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$REL" dist/*.zip dist/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit   "$REL" --notes-file '${{ steps.notes.outputs.path }}' --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$REL" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "qwen3.6-windows-server $REL — portable Windows launcher" \
+              --notes-file '${{ steps.notes.outputs.path }}' \
+              dist/*.zip dist/SHA256SUMS.txt
+          fi
