@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+title: "qwen3.6-windows-server: portable Qwen3.6-27B inference for Windows"
+message: "If you reference this launcher or its measured configurations, please cite both this project and upstream vLLM."
+authors:
+  - alias: devnen
+    affiliation: independent
+type: software
+license: Apache-2.0
+url: "https://github.com/devnen/qwen3.6-windows-server"
+repository-code: "https://github.com/devnen/qwen3.6-windows-server"
+keywords:
+  - qwen
+  - qwen3
+  - llm
+  - inference
+  - vllm
+  - windows
+  - local-llm
+references:
+  - type: software
+    title: "vLLM"
+    url: "https://github.com/vllm-project/vllm"
+  - type: software
+    title: "vllm-windows (patched wheel)"
+    url: "https://github.com/devnen/vllm-windows"
+  - type: software
+    title: "vllm-windows (SystemPanic upstream)"
+    url: "https://github.com/SystemPanic/vllm-windows"

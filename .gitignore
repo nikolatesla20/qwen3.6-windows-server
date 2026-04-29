@@ -1,0 +1,32 @@
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Logs and per-run artefacts
+logs/
+runs.tsv
+launcher.out
+*.log
+
+# User model weights (never check these in)
+models/
+
+# Local venv
+venv/
+.venv/
+
+# Build outputs (portable launcher zip + intermediates)
+dist/
+.build_launcher/
+launcher/python/
+
+# Tokenizer/config backups produced by patch_tokenizer.py
+tokenizer_config.json.bak
+*.upstream.bak
+
+# OS / editor cruft
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/
