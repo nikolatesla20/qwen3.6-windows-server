@@ -30,3 +30,6 @@ Thumbs.db
 .DS_Store
 .vscode/
 .idea/
+
+# Local-only notes (drafts, reddit posts, scratchpads — never pushed)
+_local/
