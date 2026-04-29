@@ -537,8 +537,126 @@ def t8_long_chain(base: str) -> TestResult:
     return r
 
 
+def t9_parallel_streaming_leak(base: str) -> TestResult:
+    """Streaming regression: with 3+ parallel tool calls, the qwen3_coder
+    streaming parser previously leaked the second/third call's raw XML
+    (``<tool_call><function=...><parameter=...>...</tool_call>``) into the
+    ``delta.content`` stream while ALSO emitting it as a structured
+    ``delta.tool_calls``. The chat client then rendered the leaked XML
+    as plain text in the conversation. The fix lives in the trailing-
+    free-text emission at the end of ``extract_tool_calls_streaming`` —
+    it must NOT emit text past the last structural ``</tool_call>`` if
+    a new ``<tool_call>`` opener follows.
+    """
+    r = TestResult("T9 parallel streaming leak (3 calls)")
+    t0 = time.time()
+    try:
+        body = {
+            "model": MODEL,
+            "messages": [{
+                "role": "user",
+                "content": "Get the weather (celsius) in Paris, London, and "
+                           "Berlin. Issue all three tool calls in this single "
+                           "turn. /no_think",
+            }],
+            "tools": TOOLS_WEATHER,
+            "tool_choice": "auto",
+            "stream": True,
+            "max_tokens": 500,
+            "temperature": TEMP,
+            "top_p": TOP_P,
+        }
+        req = urllib.request.Request(
+            base + "/v1/chat/completions",
+            data=json.dumps(body).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        content_total = ""
+        merged: dict = {}
+        with urllib.request.urlopen(req, timeout=DEFAULT_TIMEOUT) as resp:
+            for raw in resp:
+                line = raw.decode("utf-8", "replace").strip()
+                if not line.startswith("data:"):
+                    continue
+                payload = line[5:].strip()
+                if payload == "[DONE]":
+                    break
+                try:
+                    chunk = json.loads(payload)
+                except json.JSONDecodeError:
+                    continue
+                ch = chunk.get("choices") or []
+                if not ch:
+                    continue
+                d = ch[0].get("delta") or {}
+                cnt = d.get("content")
+                tcs = d.get("tool_calls")
+                if cnt:
+                    content_total += cnt
+                if tcs:
+                    for tc in tcs:
+                        i = tc.get("index", 0)
+                        slot = merged.setdefault(
+                            i, {"id": "", "name": "", "args": ""})
+                        if tc.get("id"):
+                            slot["id"] = tc["id"]
+                        fn = tc.get("function") or {}
+                        if fn.get("name"):
+                            slot["name"] = fn["name"]
+                        if fn.get("arguments"):
+                            slot["args"] += fn["arguments"]
+        r.elapsed = time.time() - t0
+        # Hard rule: the streamed content must not contain raw XML for any
+        # tool call. Whitespace-only text between calls is fine.
+        leak_markers = ("<tool_call>", "<function=", "<parameter=")
+        for marker in leak_markers:
+            if marker in content_total:
+                r.detail = (
+                    f"LEAK: marker {marker!r} present in delta.content "
+                    f"(len={len(content_total)}); first 200 chars="
+                    f"{content_total[:200]!r}"
+                )
+                return r
+        if len(merged) < 3:
+            r.detail = (
+                f"only {len(merged)} structured tool_call(s); expected 3"
+            )
+            return r
+        cities = []
+        for i in sorted(merged):
+            slot = merged[i]
+            if slot["name"] != "get_weather":
+                r.detail = f"call {i}: wrong tool {slot['name']!r}"
+                return r
+            try:
+                a = json.loads(slot["args"])
+            except json.JSONDecodeError as e:
+                r.detail = (
+                    f"call {i}: args not parseable JSON: "
+                    f"{slot['args']!r:.120} ({e})"
+                )
+                return r
+            cities.append(a.get("city", "").lower())
+        # The model is free in word order, but all three cities must be there.
+        wanted = {"paris", "london", "berlin"}
+        missing = wanted - set(cities)
+        if missing:
+            r.detail = f"missing cities: {missing}; got={cities}"
+            return r
+        r.ok = True
+        r.detail = (
+            f"3 streamed calls: {cities}; "
+            f"content_total={content_total.strip()!r:.40}"
+        )
+    except Exception as e:
+        r.detail = f"exception: {e!r}"
+        r.elapsed = time.time() - t0
+    return r
+
+
 ALL_TESTS = [t1_simple, t2_special_chars, t3_cot_leakage, t4_multi_turn,
-             t5_streaming, t6_nested_json, t7_parallel_calls, t8_long_chain]
+             t5_streaming, t6_nested_json, t7_parallel_calls, t8_long_chain,
+             t9_parallel_streaming_leak]
 
 
 def wait_ready(base: str, timeout: int = 240) -> bool:
