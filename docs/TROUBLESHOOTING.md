@@ -24,6 +24,7 @@ how often it bites.
 | Coherent for 30 tokens then "the the the" mid-sentence | KV-dtype too aggressive for this model class | Drop to BF16 baseline, then step back up. See [`COHERENCE.md`](COHERENCE.md). |
 | Tokenizer load fails with "tokenizer_class 'TokenizersBackend' is not recognised" | Lorbus AutoRound's custom class name | **Auto-fixed since v0.1.5** — the launcher patches `tokenizer_config.json` on every boot. Manual recovery (e.g. when running snapshots without the launcher): `python windows_tools\patch_tokenizer.py G:\_models\Qwen3.6-27B-int4-AutoRound`. |
 | Coherent output but `draft_acceptance_rate ~ 0.0` | MTP head was quantised to INT4 by the quant author and silently skipped | Use `Lorbus/Qwen3.6-27B-int4-AutoRound` specifically. See [`MTP_HEAD.md`](MTP_HEAD.md). |
+| Launcher silently picked the wrong `Qwen3.6-27B-int4-AutoRound` directory (you have several on disk) | The drive scan matches by folder name only | Since v0.1.7 the launcher prints `[model] using <path>  (source: …)` at boot and warns when a drive-scan match isn't from `Lorbus/...`. To force a specific dir: `start.bat --model-dir "X:\path\to\Lorbus\Qwen3.6-27B-int4-AutoRound" --snapshot start_72tps`, or set `$VLLM_MODEL_DIR`. |
 | Launcher TUI looks broken in legacy cmd | Console is too old for VT sequences | Install Windows Terminal (free in the Microsoft Store). The launcher tries to relaunch into it automatically. |
 
 ## When opening an issue

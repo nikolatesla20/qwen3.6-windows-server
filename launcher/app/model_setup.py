@@ -101,24 +101,59 @@ def _scan_fixed_drives() -> list[Path]:
     return hits
 
 
-def _discover() -> Path | None:
+def _discover() -> tuple[Path, str] | None:
+    """Return (model_dir, source) where source is one of:
+    'env' / 'saved-config' / 'default' / 'drive-scan'.
+
+    The source label feeds into the provenance log printed by
+    ``ensure_model`` so the user can see *which* dir the launcher
+    matched and why — important when multiple Qwen3.6-27B-int4-AutoRound
+    folders exist on disk from different uploaders.
+    """
     env = os.environ.get("VLLM_MODEL_DIR")
     if env:
         p = Path(env)
         if paths.looks_like_model_dir(p):
-            return p
+            return (p, "env")
     cfg = paths.load_user_config()
     saved = cfg.get("model_dir")
     if saved:
         p = Path(saved)
         if paths.looks_like_model_dir(p):
-            return p
+            return (p, "saved-config")
     default = paths.default_model_dir()
     if paths.looks_like_model_dir(default):
-        return default
+        return (default, "default")
     hits = _scan_fixed_drives()
     if len(hits) == 1:
-        return hits[0]
+        return (hits[0], "drive-scan")
+    return None
+
+
+def _provenance_repo_id(p: Path) -> str | None:
+    """Best-effort upstream repo id ('<org>/<repo>') for a model dir.
+
+    Two signals, in order:
+      1. Hugging Face cache layout: ``…/hub/models--<org>--<repo>/snapshots/<sha>/``
+         — any ancestor whose name starts with ``models--`` decodes cleanly.
+      2. ``config.json`` ``_name_or_path`` field.
+    Returns None when neither is conclusive.
+    """
+    for parent in [p, *p.parents]:
+        name = parent.name
+        if name.startswith("models--") and name.count("--") >= 2:
+            parts = name.split("--", 2)
+            if len(parts) == 3:
+                return f"{parts[1]}/{parts[2]}"
+    cfg_file = p / "config.json"
+    try:
+        with cfg_file.open("r", encoding="utf-8") as fh:
+            cfg = json.load(fh)
+    except (OSError, ValueError):
+        return None
+    nop = cfg.get("_name_or_path")
+    if isinstance(nop, str) and "/" in nop and not nop.startswith((".", "/")) and ":" not in nop:
+        return nop
     return None
 
 
@@ -351,8 +386,31 @@ def ensure_model(
         _autopatch(p)
         return p
 
-    found = _discover()
-    if found is not None:
+    discovered = _discover()
+    if discovered is not None:
+        found, source = discovered
+        print(f"[model] using {found}  (source: {source})")
+        if source == "drive-scan":
+            repo_id = _provenance_repo_id(found)
+            if repo_id and repo_id.lower() != REPO_ID.lower():
+                print(
+                    f"[model] note: scan matched a Qwen3.6-27B-int4-AutoRound directory "
+                    f"from {repo_id}, not {REPO_ID}."
+                )
+                print(
+                    "[model]       MTP draft-head quality is only validated on the "
+                    "Lorbus quant — see docs/MTP_HEAD.md."
+                )
+                print(
+                    "[model]       Pass --model-dir <path> (or set $VLLM_MODEL_DIR) "
+                    "to override."
+                )
+            elif repo_id is None:
+                print(
+                    "[model] note: could not determine the upstream HF repo for this "
+                    "directory; if MTP decode looks slow, confirm it's the Lorbus "
+                    "quant (see docs/MTP_HEAD.md)."
+                )
         os.environ["VLLM_MODEL_DIR"] = str(found)
         cfg = paths.load_user_config()
         if cfg.get("model_dir") != str(found):
