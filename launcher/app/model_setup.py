@@ -304,6 +304,33 @@ def _print_banner() -> None:
     print()
 
 
+def _print_scan_locations() -> None:
+    """List the directory patterns _scan_fixed_drives() checks.
+
+    Printed before --auto-download fires so a user who already has the
+    weights stashed in a non-scanned path (e.g. D:\\stuff\\Qwen3.6-...)
+    can ctrl-C and re-run with --model-dir instead of waiting on a 16 GB
+    re-download. Keep in sync with _scan_fixed_drives() above.
+    """
+    target = paths.DEFAULT_MODEL_DIRNAME
+    patterns = [
+        f"<drive>:\\{target}",
+        f"<drive>:\\_models\\{target}",
+        f"<drive>:\\models\\{target}",
+        f"<drive>:\\AI\\{target}",
+        f"<drive>:\\AI\\models\\{target}",
+        f"<drive>:\\huggingface\\{target}",
+        f"<drive>:\\huggingface\\hub\\{target}",
+        f"<drive>:\\models\\Lorbus\\{target}",
+    ]
+    print("[model] no existing weights matched any of these locations on any fixed drive:")
+    for p in patterns:
+        print(f"          {p}")
+    print("[model] if you already have the weights elsewhere, ctrl-C now and re-run with:")
+    print(f'          start.bat --model-dir "X:\\path\\to\\{target}" --snapshot start_72tps')
+    print()
+
+
 def _prompt_choice(extra_hits: list[Path]) -> tuple[str, Path | None]:
     """Returns (action, path) where action ∈ {'use','download','quit'}."""
     print("No valid Qwen3.6-27B-int4-AutoRound model directory was found.")
@@ -420,6 +447,7 @@ def ensure_model(
         return found
 
     _print_banner()
+    _print_scan_locations()
 
     if auto_download:
         target = paths.download_target_dir()
