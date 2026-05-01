@@ -21,6 +21,11 @@ Portable Windows launcher for Qwen3.6-27B inference. Unzip, double-click `start.
 3. Extract anywhere — no admin needed, **including `Program Files` / `Program Files (x86)`**.
 4. Double-click `start.bat`. On first run the launcher auto-discovers existing weights or offers to download Lorbus/Qwen3.6-27B-int4-AutoRound from Hugging Face (~16 GB, public, no token).
 
+## What's new in v0.1.4
+
+- **Snapshot logs no longer start with `'vswhere.exe' is not recognized`.** `vcvars64.bat` shells out to `vswhere.exe` with no path qualifier; the VS Installer dir isn't on `PATH` by default. `_common.msvc_env()` now prefixes `C:\Program Files (x86)\Microsoft Visual Studio\Installer` to `PATH` before calling `vcvars64.bat`. Cosmetic fix — the previous version still worked, but the scary first line of every snapshot log made it look broken.
+- **De-duplicated `msvc_env()` across all six snapshots.** Was copy-pasted into each `start_*.py`; now lives once in `snapshots/_common.py`.
+
 ## What's new in v0.1.3
 
 - **First-run runtime installer.** The portable zip ships the launcher, the patched vLLM wheel (~200 MB), a vendored `get-pip.py`, and an embedded Python — but NOT the ~6 GB of transitive deps (torch + CUDA wheels + ~150 Python packages). On first launch, `setup.py` bootstraps pip, then installs the bundled wheel + deps into the embedded Python's `site-packages`. One-time, ~5–15 min, several-GB download. A marker file makes subsequent launches no-ops. Honest scope: previous releases claimed "every dependency preinstalled" — that wasn't true and pressing Enter on a snapshot would crash with `ModuleNotFoundError: vllm`.

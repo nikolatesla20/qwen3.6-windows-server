@@ -12,6 +12,7 @@ snapshot. Resolution order:
 from __future__ import annotations
 
 import os
+import subprocess
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -64,6 +65,35 @@ def _find_vcvars() -> str:
 
 
 VCVARS = _find_vcvars()
+
+# vswhere.exe lives under the VS Installer dir, NOT on PATH by default.
+# vcvars64.bat shells out to vswhere.exe with no path qualifier, so without
+# this prefix the snapshot logs start with a scary
+# `'vswhere.exe' is not recognized as an internal or external command` line
+# even though vcvars then falls through to a working VS install.
+VS_INSTALLER_DIR = r"C:\Program Files (x86)\Microsoft Visual Studio\Installer"
+
+
+def msvc_env() -> dict:
+    """Capture env vars set by vcvars64.bat so FlashInfer's ninja+cl.exe JIT works.
+
+    Without this, fp8 KV hits a FileNotFoundError when FlashInfer tries to
+    compile a new prefill kernel at first request.
+    """
+    if not Path(VCVARS).exists():
+        print(f"[warn] vcvars64.bat not found at {VCVARS} - FlashInfer JIT may fail.")
+        return {}
+    path_prefix = f'set "PATH={VS_INSTALLER_DIR};%PATH%" && ' if Path(VS_INSTALLER_DIR).is_dir() else ""
+    out = subprocess.check_output(
+        f'cmd /S /C "{path_prefix}"{VCVARS}" && set"',
+        text=True, errors="replace",
+    )
+    env = {}
+    for line in out.splitlines():
+        if "=" in line:
+            k, v = line.split("=", 1)
+            env[k] = v
+    return env
 
 def _resolve_logs_dir() -> Path:
     """Return a writable logs dir.

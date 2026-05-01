@@ -20,7 +20,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 # Reuse the existing Windows vLLM install so this folder stays rollbackable.
-from _common import VENV, VLLM_EXE, MODEL_PATH, VCVARS, log_path_for, enhanced_jinja_path
+from _common import VENV, VLLM_EXE, MODEL_PATH, VCVARS, msvc_env, log_path_for, enhanced_jinja_path
 SERVED_NAME = "qwen3.6-27b-autoround"
 HOST = "0.0.0.0"
 PORT = 5001  # different from vllm-windows (5000), so both can coexist if needed
@@ -48,27 +48,6 @@ MAX_NUM_BATCHED_TOKENS = 4128
 ENFORCE_EAGER = False   # cudagraphs on for decode speedup
 ENABLE_VISION = False   # MoonViT tower adds ~0.9 GB; Windows c10d allreduce
                         # can crash during vision profile. Keep off initially.
-def msvc_env() -> dict:
-    """Capture env vars set by vcvars64.bat so FlashInfer's ninja+cl.exe JIT works.
-    Without this, fp8 KV hits a FileNotFoundError when FlashInfer tries to compile
-    a new prefill kernel at first request.
-    """
-    if not Path(VCVARS).exists():
-        print(f"[warn] vcvars64.bat not found at {VCVARS} — FlashInfer JIT may fail.")
-        return {}
-    # Use cmd.exe /S /C so the outer quotes are stripped and inner quotes work.
-    out = subprocess.check_output(
-        f'cmd /S /C ""{VCVARS}" && set"',
-        text=True, errors="replace",
-    )
-    env = {}
-    for line in out.splitlines():
-        if "=" in line:
-            k, v = line.split("=", 1)
-            env[k] = v
-    return env
-
-
 def port_in_use(host: str, port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.settimeout(0.5)

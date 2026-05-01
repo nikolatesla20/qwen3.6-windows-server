@@ -24,7 +24,7 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-from _common import VENV, VLLM_EXE, MODEL_PATH, VCVARS, log_path_for, enhanced_jinja_path
+from _common import VENV, VLLM_EXE, MODEL_PATH, VCVARS, msvc_env, log_path_for, enhanced_jinja_path
 SERVED_NAME = "qwen3.6-27b-autoround"
 HOST = "0.0.0.0"
 PORT = 5002  # baseline 72-tok/s server owns 5001
@@ -50,22 +50,6 @@ MAX_NUM_BATCHED_TOKENS = 4128
 
 ENFORCE_EAGER = False
 ENABLE_VISION = False
-def msvc_env() -> dict:
-    if not Path(VCVARS).exists():
-        print(f"[warn] vcvars64.bat not found at {VCVARS}")
-        return {}
-    out = subprocess.check_output(
-        f'cmd /S /C ""{VCVARS}" && set"',
-        text=True, errors="replace",
-    )
-    env = {}
-    for line in out.splitlines():
-        if "=" in line:
-            k, v = line.split("=", 1)
-            env[k] = v
-    return env
-
-
 def port_in_use(host: str, port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.settimeout(0.5)
