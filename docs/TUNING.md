@@ -5,7 +5,7 @@ KV, FlashInfer, and a few Genesis patches are unavailable. What remains:
 
 ## Decode TPS
 
-1. **MTP num_speculative_tokens.** The Reddit "n=3 is the sweet spot"
+1. **MTP num_speculative_tokens.** The widely-repeated "n=3 is the sweet spot"
    conventional wisdom is for *short prompts*. On long-prompt dense code
    (~100 KB / ~24 k tokens of Python source, our bench harness) the
    acceptance curve shifts later:

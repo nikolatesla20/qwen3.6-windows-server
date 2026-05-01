@@ -1,8 +1,8 @@
 # Flags you'll see online that don't exist here
 
-The vLLM ecosystem moves fast and search engines + Reddit posts + ppx-cli
-output happily reference flags from later releases, niche forks, or pure
-hallucination. **Before trying any "creative" flag from a web answer,
+The vLLM ecosystem moves fast and outdated recipes online, blog posts,
+and LLM-generated answers happily reference flags from later releases,
+niche forks, or pure hallucination. **Before trying any "creative" flag from a web answer,
 verify it actually exists on this wheel.**
 
 How to verify env vars:
@@ -29,7 +29,7 @@ How to verify CLI flags:
 | `--kv-cache-dtype=int8` | Suggested by ppx | Not accepted. TRITON_ATTN takes only `auto` (BF16), `fp8`, `fp8_e4m3`. |
 | `--kv-cache-dtype=NVFP4` / `MXFP4` | Late-2025 vLLM features | Not in 0.19.0. |
 | `--kv-cache-dtype=turboquant_3bit_nc` | Genesis patches blog posts | Not in 0.19.0; needs the Genesis tree which hasn't been Windows-ported. |
-| `--kv-cache-dtype=fp8_e5m2` | Linux recipes from r/LocalLLaMA | Rejected by TRITON_ATTN with `only accepts {"fp8","fp8_e4m3"}`. Use `fp8_e4m3`. |
+| `--kv-cache-dtype=fp8_e5m2` | Older Linux recipes | Rejected by TRITON_ATTN with `only accepts {"fp8","fp8_e4m3"}`. Use `fp8_e4m3`. |
 | `VLLM_ATTENTION_BACKEND` env var | "set this and you're done" | The env var is *ignored* on 0.19.0. Pass `--attention-backend=TRITON_ATTN` as a CLI arg instead. (Set the env var too if you like — only the CLI matters.) |
 | `--enable-turboquant` | Turbo project flags | Not in this wheel. |
 | `--cpu-offload-gb` | "for big models" | Exists but extends *batch capacity*, not *per-sequence ctx*. With `max-num-seqs=1` it does nothing useful. |
@@ -47,7 +47,7 @@ How to verify CLI flags:
 
 ## Where the bad info comes from
 
-- **Reddit recipes** often pin a nightly vLLM version that has flags 0.19.0
+- **Outdated recipes online** often pin a nightly vLLM version that has flags 0.19.0
   doesn't.
 - **Linux-only patches** (Genesis, TurboQuant, DFlash drafter) get
   cross-posted with no caveat.

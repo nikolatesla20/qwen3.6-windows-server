@@ -8,7 +8,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Made for Windows](https://img.shields.io/badge/OS-Windows%2010%2F11-0078d6.svg)](https://www.microsoft.com/windows)
 [![GPU](https://img.shields.io/badge/tested-RTX%203090-76b900.svg)](https://www.nvidia.com/)
-[![Local AI](https://img.shields.io/badge/100%25-local%20%2F%20offline-success.svg)](https://www.reddit.com/r/LocalLLaMA/)
+[![Local AI](https://img.shields.io/badge/100%25-local%20%2F%20offline-success.svg)](#the-local-ai-ethos)
 
 ---
 
@@ -27,7 +27,7 @@ ships inside the launcher zip.
 
 On a single RTX 3090 (24 GB), running [Lorbus AutoRound INT4](https://huggingface.co/Lorbus/Qwen3.6-27B-int4-AutoRound):
 
-Every snapshot below has the tool-calling fix baked in (PR #35687 + #40861 + `qwen3.5-enhanced.jinja` + `preserve_thinking=false`), so any one of them works for Cline / Cursor / Codex CLI / OpenWebUI — just point at the listed port.
+Every snapshot below has the tool-calling fix baked in (PR #35687 + #40861 + `qwen3.5-enhanced.jinja` + `preserve_thinking=false`), so any one of them works with any OpenAI-compatible client — Cline, Cursor, Codex CLI, Continue, LM Studio, OpenWebUI, etc. Just point it at the listed port.
 
 | Snapshot              | Decode tok/s | Prompt class      | Context | Use it when |
 |-----------------------|--------------|-------------------|---------|-------------|
@@ -92,6 +92,13 @@ That installs the runtime, downloads the model if missing, and starts
 serving on `http://127.0.0.1:5001/v1`. See
 [Headless / scripted install](#headless--scripted-install) below for
 all the flags.
+
+**Hand the install to a coding agent** — copy/paste prompt at
+[`docs/AGENT_INSTALL_PROMPT.md`](docs/AGENT_INSTALL_PROMPT.md). Edit the
+one `INSTALL_DIR` line, paste into Claude Code / Cursor / Codex CLI /
+any agent with shell access, and it does the download + extract +
+runtime install + model fetch + smoke test end-to-end while you do
+something else.
 
 **Interactive path:**
 

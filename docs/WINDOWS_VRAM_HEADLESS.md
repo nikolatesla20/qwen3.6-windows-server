@@ -234,8 +234,8 @@ taskkill /F /IM msedge.exe   2>nul
 taskkill /F /IM Teams.exe    2>nul
 taskkill /F /IM Outlook.exe  2>nul
 taskkill /F /IM Discord.exe  2>nul
-taskkill /F /IM SnagitEditor.exe 2>nul
-taskkill /F /IM Snagit32.exe 2>nul
+:: add any other GPU-using desktop apps you have running
+:: (screenshot tools, video players, electron apps, etc.)
 timeout /t 2 /nobreak >nul
 nvidia-smi --query-gpu=memory.free --format=csv
 ```

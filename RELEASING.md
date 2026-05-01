@@ -2,25 +2,16 @@
 
 End-to-end automated.
 
-## One-time setup (REQUIRED while `devnen/vllm-windows` is private)
+## One-time setup
 
-The release workflow downloads the patched wheel from the
-`devnen/vllm-windows` release assets. The default `GITHUB_TOKEN` cannot
-read another private repo, so create a fine-grained PAT:
+None required. `devnen/vllm-windows` is public, so the release workflow
+downloads the patched wheel using the default `${{ secrets.GITHUB_TOKEN }}`.
+No PAT, no `WHEEL_RELEASE_TOKEN` secret needed.
 
-1. Go to <https://github.com/settings/personal-access-tokens/new>.
-2. Token name: `qwen36-windows-server-wheel-read`. Expiration: pick something reasonable.
-3. Resource owner: `devnen`.
-4. Repository access: *Only select repositories* → pick `devnen/vllm-windows`.
-5. Repository permissions → **Contents: Read-only**. (Nothing else.)
-6. Generate, copy the `github_pat_…` value.
-7. In `devnen/qwen3.6-windows-server` → *Settings → Secrets and variables → Actions → New repository secret*:
-   - Name: `WHEEL_RELEASE_TOKEN`
-   - Value: the PAT.
-
-Once `devnen/vllm-windows` is made public, this PAT is no longer
-needed — the workflow falls back to `${{ secrets.GITHUB_TOKEN }}`
-automatically.
+> Historical note: while `devnen/vllm-windows` was private, this repo
+> required a fine-grained `WHEEL_RELEASE_TOKEN` PAT with `Contents: Read`
+> on the wheel repo. The workflow still honors that secret if it's set,
+> but it's no longer necessary.
 
 ## Release flow
 
