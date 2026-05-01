@@ -78,11 +78,13 @@ This launcher is the third option:
 
 1. Download [`qwen3.6-windows-server-portable-x64.zip`](../../releases/latest)
    from the latest Release. Extract anywhere (no admin needed).
-2. Drop your Qwen3.6-27B INT4 weights into
-   `models\Qwen3.6-27B-int4-AutoRound\` next to the launcher, **or** set
-   the `VLLM_MODEL_DIR` environment variable to wherever they live.
-3. Double-click `start.bat`. The TUI opens. Pick a snapshot, press
-   Enter, you're serving on `http://127.0.0.1:5001/v1`.
+2. Double-click `start.bat`. On first run the launcher looks for the
+   Qwen3.6-27B-int4-AutoRound weights — if it can't find them, it
+   offers to **auto-download from Hugging Face** (~16 GB, public, no
+   token needed) or accepts a path to weights you already have. The
+   choice is saved, so subsequent launches go straight to the TUI.
+3. Pick a snapshot, press Enter, you're serving on
+   `http://127.0.0.1:5001/v1`.
 
 The portable zip ships with an embedded Python 3.12 runtime and every
 dependency preinstalled. No `pip install`, no `conda`, no internet

@@ -43,8 +43,33 @@ def _find_vcvars() -> str:
 
 VCVARS = _find_vcvars()
 
-LOGS_DIR = Path(os.environ.get("VLLM_WINDOWS_LOGS", str(REPO_ROOT / "logs")))
-LOGS_DIR.mkdir(parents=True, exist_ok=True)
+def _resolve_logs_dir() -> Path:
+    """Return a writable logs dir.
+
+    Honors $VLLM_WINDOWS_LOGS if set. Otherwise tries repo_root/logs, and
+    falls back to %LocalAppData%\\qwen36-windows-server\\logs when the
+    repo root is read-only (e.g. installs under Program Files).
+    """
+    env = os.environ.get("VLLM_WINDOWS_LOGS")
+    if env:
+        d = Path(env)
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+    candidate = REPO_ROOT / "logs"
+    try:
+        candidate.mkdir(parents=True, exist_ok=True)
+        probe = candidate / ".write_probe"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink()
+        return candidate
+    except OSError:
+        base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~\\AppData\\Local")
+        d = Path(base) / "qwen36-windows-server" / "logs"
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+
+
+LOGS_DIR = _resolve_logs_dir()
 
 
 def log_path_for(port: int) -> Path:

@@ -70,11 +70,22 @@ def main() -> int:
     with zipfile.ZipFile(embed_zip) as zf:
         zf.extractall(py_dir)
 
-    # 3. enable site-packages in ._pth
+    # 3. enable site-packages in ._pth + add ..\launcher so `python -m app`
+    # works without relying on PYTHONPATH (embedded distros ignore it).
     pth = next(py_dir.glob("python*._pth"))
     txt = pth.read_text(encoding="utf-8")
     if "Lib\\site-packages" not in txt:
         txt = txt.rstrip() + "\nLib\\site-packages\n"
+    if "..\\launcher" not in txt:
+        # Insert right after the first '.' line so it has high priority.
+        lines = txt.splitlines()
+        for i, line in enumerate(lines):
+            if line.strip() == ".":
+                lines.insert(i + 1, "..\\launcher")
+                break
+        else:
+            lines.append("..\\launcher")
+        txt = "\n".join(lines) + "\n"
     if "import site" in txt and "#import site" in txt:
         txt = txt.replace("#import site", "import site")
     elif "import site" not in txt:

@@ -5,6 +5,10 @@ REM
 REM  This .bat is the only thing you need to run. It uses the embeddable
 REM  Python that ships next to it (..\python\) — no pip install, no
 REM  conda, no admin, no internet required.
+REM
+REM  Note: avoids parenthesized IF blocks because the install path may
+REM  contain unbalanced parens (e.g. C:\Program Files (x86)\vllm\)
+REM  which break cmd.exe's parser inside (...).
 REM ===================================================================
 
 setlocal EnableDelayedExpansion
@@ -15,40 +19,46 @@ set "APP_ROOT=%~dp0"
 if "%APP_ROOT:~-1%"=="\" set "APP_ROOT=%APP_ROOT:~0,-1%"
 set "REPO_ROOT=%APP_ROOT%\.."
 
-REM Prefer a sibling 'python\' (portable embed). Fall back to a 'venv\python.exe'
-REM when running from a developer checkout.
-if exist "%REPO_ROOT%\python\python.exe" (
-    set "PYTHON=%REPO_ROOT%\python\python.exe"
-    set "PYTHONHOME=%REPO_ROOT%\python"
-) else if exist "%APP_ROOT%\python\python.exe" (
-    set "PYTHON=%APP_ROOT%\python\python.exe"
-    set "PYTHONHOME=%APP_ROOT%\python"
-) else if exist "%REPO_ROOT%\venv\Scripts\python.exe" (
-    set "PYTHON=%REPO_ROOT%\venv\Scripts\python.exe"
-) else (
-    echo [start.bat] could not find a Python interpreter. Expected:
-    echo    %REPO_ROOT%\python\python.exe   (portable release zip)
-    echo    %REPO_ROOT%\venv\Scripts\python.exe   (developer checkout)
-    pause
-    exit /b 1
-)
+REM Resolve PYTHON via flat IF chain (parens-safe).
+set "PYTHON="
+set "PYTHONHOME="
+if exist "%REPO_ROOT%\python\python.exe" set "PYTHON=%REPO_ROOT%\python\python.exe" & set "PYTHONHOME=%REPO_ROOT%\python"
+if not defined PYTHON if exist "%APP_ROOT%\python\python.exe" set "PYTHON=%APP_ROOT%\python\python.exe" & set "PYTHONHOME=%APP_ROOT%\python"
+if not defined PYTHON if exist "%REPO_ROOT%\venv\Scripts\python.exe" set "PYTHON=%REPO_ROOT%\venv\Scripts\python.exe"
+if not defined PYTHON goto :no_python
 
 set "PYTHONIOENCODING=utf-8"
 set "PYTHONUTF8=1"
 set "PYTHONUNBUFFERED=1"
+REM Embedded python ignores PYTHONPATH (python312._pth gates sys.path),
+REM so the build script also writes "..\launcher" into the _pth file.
+REM We still set PYTHONPATH for non-embedded fallback (developer venv).
 set "PYTHONPATH=%APP_ROOT%"
 
 REM Open inside Windows Terminal if available — the launcher's TUI looks
 REM much better there than in legacy cmd. Skip if already inside WT.
-if not defined WT_SESSION if not defined VLLM_NO_WT (
-    set "WT_EXE="
-    if exist "C:\Program Files\WindowsTerminal\wt.exe" set "WT_EXE=C:\Program Files\WindowsTerminal\wt.exe"
-    if not defined WT_EXE if exist "C:\Program Files\WindowsTerminal\WindowsTerminal.exe" set "WT_EXE=C:\Program Files\WindowsTerminal\WindowsTerminal.exe"
-    if defined WT_EXE (
-        "!WT_EXE!" -w vllm-launcher new-tab -d "%APP_ROOT%" --title "vLLM Launcher" cmd /c """%~f0""" %*
-        exit /b 0
-    )
-)
+if defined WT_SESSION goto :run
+if defined VLLM_NO_WT goto :run
+set "WT_EXE="
+if exist "C:\Program Files\WindowsTerminal\wt.exe" set "WT_EXE=C:\Program Files\WindowsTerminal\wt.exe"
+if not defined WT_EXE if exist "C:\Program Files\WindowsTerminal\WindowsTerminal.exe" set "WT_EXE=C:\Program Files\WindowsTerminal\WindowsTerminal.exe"
+if not defined WT_EXE goto :run
+"!WT_EXE!" -w vllm-launcher new-tab -d "%APP_ROOT%" --title "vLLM Launcher" cmd /c """%~f0""" %*
+exit /b 0
 
+:run
 "%PYTHON%" -m app %*
-exit /b %ERRORLEVEL%
+set "ERR=%ERRORLEVEL%"
+if "%ERR%"=="0" exit /b 0
+echo.
+echo [start.bat] launcher exited with code %ERR%.
+echo Scroll up for the traceback. Press a key to close this window.
+pause >nul
+exit /b %ERR%
+
+:no_python
+echo [start.bat] could not find a Python interpreter. Expected:
+echo    %REPO_ROOT%\python\python.exe   (portable release zip)
+echo    %REPO_ROOT%\venv\Scripts\python.exe   (developer checkout)
+pause
+exit /b 1

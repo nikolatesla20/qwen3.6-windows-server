@@ -1,6 +1,8 @@
 from __future__ import annotations
 import argparse
 import sys
+import traceback
+from . import model_setup
 from .app import LauncherApp
 
 
@@ -10,6 +12,8 @@ def main() -> None:
     s = sub.add_parser("serve", help="Run web UI only (textual-serve)")
     s.add_argument("--host", default="localhost")
     s.add_argument("--port", type=int, default=8765)
+    p.add_argument("--skip-model-check", action="store_true",
+                   help="Skip the pre-TUI model discovery prompt.")
     args = p.parse_args()
 
     if args.cmd == "serve":
@@ -17,6 +21,18 @@ def main() -> None:
         cmd = f'"{sys.executable}" -m vllm_launcher'
         Server(command=cmd, host=args.host, port=args.port, title="vLLM Launcher").serve()
         return
+
+    if not args.skip_model_check:
+        try:
+            model_setup.ensure_model()
+        except KeyboardInterrupt:
+            print("\nAborted.")
+            sys.exit(130)
+        except Exception:  # noqa: BLE001
+            print("\n[start] model setup failed:\n")
+            traceback.print_exc()
+            input("\nPress Enter to exit...")
+            sys.exit(1)
 
     LauncherApp().run()
 
