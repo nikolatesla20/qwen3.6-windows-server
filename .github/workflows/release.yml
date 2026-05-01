@@ -67,17 +67,25 @@ jobs:
           override='${{ inputs.wheel_url }}'
           if [ -n "$override" ]; then
             URL="$override"
+            # Best-effort name guess from the URL; build_launcher_zip.py
+            # falls back to legacy "vllm.whl" if the name isn't PEP 427.
+            NAME=$(basename "${URL%%\?*}")
           else
             URL=$(gh release view --repo devnen/vllm-windows --json assets \
                   -q '.assets[] | select(.name | endswith(".whl")) | .url' \
+                  | head -n1)
+            NAME=$(gh release view --repo devnen/vllm-windows --json assets \
+                  -q '.assets[] | select(.name | endswith(".whl")) | .name' \
                   | head -n1)
           fi
           if [ -z "$URL" ]; then
             echo "::error::No wheel URL resolved. Set inputs.wheel_url or ensure devnen/vllm-windows has a .whl asset on its latest release."
             exit 1
           fi
-          echo "url=$URL" >> "$GITHUB_OUTPUT"
-          echo "Using wheel: $URL"
+          if [ -z "$NAME" ]; then NAME="vllm.whl"; fi
+          echo "url=$URL"   >> "$GITHUB_OUTPUT"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "Using wheel: $NAME ($URL)"
 
       - name: Download wheel
         shell: bash
@@ -86,18 +94,21 @@ jobs:
         run: |
           set -euo pipefail
           URL='${{ steps.wheel.outputs.url }}'
-          # Use gh api for private-repo asset downloads; falls back to curl for public URLs.
+          NAME='${{ steps.wheel.outputs.name }}'
+          # Preserve the wheel's real PEP 427 filename so build_launcher_zip.py
+          # can ship it under that name and the launcher's setup.py can skip
+          # the rename-at-install-time dance.
           if [[ "$URL" == https://api.github.com/* ]]; then
-            gh api "$URL" -H "Accept: application/octet-stream" > vllm.whl
+            gh api "$URL" -H "Accept: application/octet-stream" > "$NAME"
           else
-            curl -sSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/octet-stream" "$URL" -o vllm.whl
+            curl -sSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/octet-stream" "$URL" -o "$NAME"
           fi
-          ls -lh vllm.whl
+          ls -lh "$NAME"
 
       - name: Build portable launcher zip
         shell: bash
         run: |
-          python windows_tools/build_launcher_zip.py --wheel vllm.whl
+          python windows_tools/build_launcher_zip.py --wheel '${{ steps.wheel.outputs.name }}'
 
       - name: Generate SHA256SUMS.txt
         shell: bash

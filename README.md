@@ -111,11 +111,38 @@ Once the server is up:
 ```powershell
 curl http://127.0.0.1:5001/v1/chat/completions ^
   -H "Content-Type: application/json" ^
-  -d "{\"model\":\"any\",\"messages\":[{\"role\":\"user\",\"content\":\"Capital of France?\"}],\"max_tokens\":50}"
+  -d "{\"model\":\"any\",\"messages\":[{\"role\":\"user\",\"content\":\"Capital of France?\"}],\"max_tokens\":2000}"
 ```
 
 Note the `"model": "any"` — the patched wheel accepts any value. You
 don't have to know what the model is called.
+
+> **Why `max_tokens: 2000`?** Qwen3.6 is a thinking model: it spends the
+> first chunk of its budget reasoning inside `<think>...</think>` and
+> only then writes the answer to `content`. With `max_tokens: 50` the
+> entire budget gets eaten by the thinking phase and you'll see
+> `content: null` plus `finish_reason: "length"` — the server is fine,
+> the budget was just too small. 1500–2000 is a safe floor for short Q&A.
+
+## Headless / scripted install
+
+End-to-end automated install (no TUI, no prompts) — useful for CI,
+remote machines, agent installers, or just keeping a repeatable
+recipe:
+
+```powershell
+start.bat --auto-download --snapshot start_72tps
+```
+
+The launcher runs the first-run setup (vLLM wheel + ~150 deps),
+auto-downloads the Lorbus quant from Hugging Face if it's missing,
+applies the tokenizer patch automatically, and execs the chosen
+snapshot — all without opening the TUI. Other useful flags:
+
+```powershell
+start.bat --model-dir G:\_models\Qwen3.6-27B-int4-AutoRound --snapshot start_speed
+start.bat --headless     :: just run setup checks, then exit
+```
 
 For benchmark numbers like the table above, use the bundled tools:
 

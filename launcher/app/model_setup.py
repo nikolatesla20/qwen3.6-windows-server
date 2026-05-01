@@ -16,11 +16,17 @@ If nothing is found, prompts the user:
 
 Auto-download uses stdlib urllib only — no huggingface_hub dependency.
 The Lorbus repo is public so the resolve URLs work anonymously.
+
+After a model dir is identified (whether discovered, entered, or freshly
+downloaded) we always run ``apply_tokenizer_patch`` so the
+``TokenizersBackend`` -> ``Qwen2Tokenizer`` fix is applied without the
+user having to read the troubleshooting doc.
 """
 from __future__ import annotations
 
 import json
 import os
+import shutil
 import string
 import sys
 import time
@@ -30,6 +36,18 @@ from pathlib import Path
 from typing import Iterable
 
 from . import paths
+
+# Reuse the canonical patcher so the rule lives in one place. We append
+# the windows_tools dir to sys.path because the embedded python ships it
+# alongside launcher/, but doesn't put it on import path automatically.
+_WINDOWS_TOOLS = paths.install_root() / "windows_tools"
+if _WINDOWS_TOOLS.is_dir() and str(_WINDOWS_TOOLS) not in sys.path:
+    sys.path.insert(0, str(_WINDOWS_TOOLS))
+try:
+    from patch_tokenizer import apply_tokenizer_patch  # type: ignore
+except ImportError:  # pragma: no cover — missing windows_tools/, dev checkout
+    def apply_tokenizer_patch(model_dir, keep_backup: bool = False) -> bool:  # type: ignore
+        return False
 
 REPO_ID = paths.DEFAULT_MODEL_REPO
 HF_API_TREE = f"https://huggingface.co/api/models/{REPO_ID}/tree/main?recursive=1"
@@ -112,12 +130,19 @@ def _list_repo_files() -> list[dict]:
     return out
 
 
-def _fmt_bytes(n: int) -> str:
+def _fmt_bytes(n: float) -> str:
     for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
         if n < 1024:
             return f"{n:.2f} {unit}"
         n /= 1024.0
     return f"{n:.2f} PiB"
+
+
+def _is_tty() -> bool:
+    try:
+        return bool(sys.stdout.isatty())
+    except (AttributeError, ValueError):
+        return False
 
 
 def _download_one(rel_path: str, dest: Path, expected_size: int) -> None:
@@ -133,6 +158,13 @@ def _download_one(rel_path: str, dest: Path, expected_size: int) -> None:
     started = time.time()
     last_print = 0.0
     bytes_done = 0
+    tty = _is_tty()
+    # On a TTY we update an in-place \r progress bar twice a second.
+    # Off a TTY (logs, CI, agents, piped output) the \r turns the whole
+    # download into one mega-line, so emit a newline-terminated line every
+    # ~5 s instead. Keep the cadence loose so a 2 GB shard prints ~10
+    # lines, not 200.
+    interval = 0.5 if tty else 5.0
     try:
         with urllib.request.urlopen(req, timeout=60) as r, open(tmp, "wb") as fh:
             total = int(r.headers.get("Content-Length") or expected_size or 0)
@@ -144,22 +176,30 @@ def _download_one(rel_path: str, dest: Path, expected_size: int) -> None:
                 fh.write(buf)
                 bytes_done += len(buf)
                 now = time.time()
-                if now - last_print >= 0.5 or (total and bytes_done == total):
+                if now - last_print >= interval or (total and bytes_done == total):
                     pct = (bytes_done * 100 / total) if total else 0
                     elapsed = max(now - started, 1e-3)
                     rate = bytes_done / elapsed
-                    bar_w = 30
-                    fill = int(bar_w * pct / 100) if total else 0
-                    bar = "#" * fill + "." * (bar_w - fill)
-                    sys.stdout.write(
-                        f"\r  {rel_path[:40]:40s} [{bar}] {pct:5.1f}%  "
-                        f"{_fmt_bytes(bytes_done)} / {_fmt_bytes(total)}  "
-                        f"{_fmt_bytes(int(rate))}/s        "
-                    )
+                    if tty:
+                        bar_w = 30
+                        fill = int(bar_w * pct / 100) if total else 0
+                        bar = "#" * fill + "." * (bar_w - fill)
+                        sys.stdout.write(
+                            f"\r  {rel_path[:40]:40s} [{bar}] {pct:5.1f}%  "
+                            f"{_fmt_bytes(bytes_done)} / {_fmt_bytes(total)}  "
+                            f"{_fmt_bytes(int(rate))}/s        "
+                        )
+                    else:
+                        sys.stdout.write(
+                            f"  {rel_path}  {pct:5.1f}%  "
+                            f"{_fmt_bytes(bytes_done)} / {_fmt_bytes(total)}  "
+                            f"{_fmt_bytes(int(rate))}/s\n"
+                        )
                     sys.stdout.flush()
                     last_print = now
-        sys.stdout.write("\n")
-        sys.stdout.flush()
+        if tty:
+            sys.stdout.write("\n")
+            sys.stdout.flush()
         tmp.replace(dest)
     except (urllib.error.URLError, OSError) as e:
         if tmp.exists():
@@ -174,6 +214,20 @@ def _download_repo(dest_root: Path) -> None:
     total_bytes = sum(f["size"] for f in files)
     print(f"  {len(files)} files, ~{_fmt_bytes(total_bytes)} total\n")
     print(f"Destination: {dest_root}")
+    # Free-space preflight on the destination drive — fail loud BEFORE
+    # writing 16 GB of partial shards into a too-small disk.
+    try:
+        dest_root.parent.mkdir(parents=True, exist_ok=True)
+        free = shutil.disk_usage(dest_root.parent).free
+        print(f"Free space:  {_fmt_bytes(free)} on {dest_root.anchor or dest_root.parent}")
+        if free < total_bytes:
+            print(f"\n[ERROR] Need ~{_fmt_bytes(total_bytes)} but only {_fmt_bytes(free)} free.")
+            print("Free up space, or set $VLLM_MODELS_DIR to a larger drive and re-run.")
+            sys.exit(1)
+        if free < total_bytes * 1.1:
+            print("[warn] Free space is tight (<10% headroom). Consider a roomier drive.")
+    except OSError:
+        pass
     print("Downloading. Resumable: a re-run will skip files already present at the right size.\n")
     dest_root.mkdir(parents=True, exist_ok=True)
     for i, f in enumerate(files, 1):
@@ -241,15 +295,45 @@ def _prompt_choice(extra_hits: list[Path]) -> tuple[str, Path | None]:
             continue
 
 
+def _autopatch(model_dir: Path) -> None:
+    """Apply tokenizer patch if needed; print only when something changed."""
+    try:
+        if apply_tokenizer_patch(model_dir):
+            print(f"  [autopatch] tokenizer_config.json: 'TokenizersBackend' -> 'Qwen2Tokenizer'")
+    except Exception as e:  # noqa: BLE001 — never let the patch crash the launcher
+        print(f"  [autopatch] WARNING: could not patch tokenizer_config.json: {e}")
+
+
 # ---------------------------------------------------------------- entrypoint
 
 
-def ensure_model() -> Path:
+def ensure_model(
+    *,
+    auto_download: bool = False,
+    explicit_dir: Path | None = None,
+) -> Path:
     """Block until a usable model dir is identified. Sets VLLM_MODEL_DIR.
 
     Persists the resolved path to user_config.json so subsequent launches
     skip the prompt entirely.
+
+    Headless flags:
+      ``explicit_dir`` — use this exact path; error if it doesn't validate.
+      ``auto_download`` — when no model is found, download instead of prompting.
     """
+    if explicit_dir is not None:
+        p = Path(explicit_dir)
+        if not paths.looks_like_model_dir(p):
+            print(f"\n[ERROR] --model-dir {p} does not look like a Qwen3.6 model dir")
+            print("(needs config.json + .safetensors).")
+            sys.exit(1)
+        os.environ["VLLM_MODEL_DIR"] = str(p)
+        cfg = paths.load_user_config()
+        cfg["model_dir"] = str(p)
+        paths.save_user_config(cfg)
+        _autopatch(p)
+        return p
+
     found = _discover()
     if found is not None:
         os.environ["VLLM_MODEL_DIR"] = str(found)
@@ -257,9 +341,26 @@ def ensure_model() -> Path:
         if cfg.get("model_dir") != str(found):
             cfg["model_dir"] = str(found)
             paths.save_user_config(cfg)
+        _autopatch(found)
         return found
 
     _print_banner()
+
+    if auto_download:
+        target = paths.download_target_dir()
+        print(f"--auto-download set; pulling Lorbus/Qwen3.6-27B-int4-AutoRound to {target}")
+        _download_repo(target)
+        if not paths.looks_like_model_dir(target):
+            print(f"\n✗ Download finished but {target} still doesn't look like a model dir.")
+            sys.exit(1)
+        os.environ["VLLM_MODEL_DIR"] = str(target)
+        cfg = paths.load_user_config()
+        cfg["model_dir"] = str(target)
+        paths.save_user_config(cfg)
+        _autopatch(target)
+        print(f"\n✓ Model ready at: {target}\n")
+        return target
+
     hits = _scan_fixed_drives()
     while True:
         action, path = _prompt_choice(hits)
@@ -271,6 +372,7 @@ def ensure_model() -> Path:
             cfg = paths.load_user_config()
             cfg["model_dir"] = str(path)
             paths.save_user_config(cfg)
+            _autopatch(path)
             print(f"\n✓ Using model at: {path}\n")
             return path
         if action == "download" and path is not None:
@@ -287,5 +389,6 @@ def ensure_model() -> Path:
             cfg = paths.load_user_config()
             cfg["model_dir"] = str(path)
             paths.save_user_config(cfg)
+            _autopatch(path)
             print(f"\n✓ Model ready at: {path}\n")
             return path

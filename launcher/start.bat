@@ -36,9 +36,13 @@ REM We still set PYTHONPATH for non-embedded fallback (developer venv).
 set "PYTHONPATH=%APP_ROOT%"
 
 REM Open inside Windows Terminal if available — the launcher's TUI looks
-REM much better there than in legacy cmd. Skip if already inside WT.
+REM much better there than in legacy cmd. Skip if already inside WT, or
+REM if the caller is running in headless / scripted mode (--headless,
+REM --snapshot, --auto-download). Relaunching into a new WT window would
+REM detach from the parent shell and break automation.
 if defined WT_SESSION goto :run
 if defined VLLM_NO_WT goto :run
+echo.%*| findstr /I /C:"--headless" /C:"--snapshot" /C:"--auto-download" /C:"--model-dir" /C:" -y " /C:"--yes" >nul && goto :run
 REM Prefer the bundled portable Windows Terminal that ships in the release
 REM zip (..\terminal\WindowsTerminal.exe). Fall back to a system install
 REM under Program Files if the user happens to have one. If neither is

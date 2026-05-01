@@ -154,10 +154,20 @@ def main() -> int:
         if not wheel_src.exists():
             print(f"[build] WARNING: --wheel {wheel_src} not found; skipping bundle", file=sys.stderr)
         else:
-            # Snapshot scripts and setup.py both look for "vllm.whl" so the
-            # filename is decoupled from the version embedded inside.
-            shutil.copy2(wheel_src, wheels_dir / "vllm.whl")
-            print(f"[build] bundled wheel: {wheel_src.name} -> wheels/vllm.whl")
+            # Ship the wheel under its real PEP 427 filename (e.g.
+            # ``vllm-0.19.0+devnen.1-cp312-cp312-win_amd64.whl``). The
+            # launcher's setup.py looks for ``wheels/vllm-*.whl`` first
+            # and only falls back to the legacy ``vllm.whl`` for back-compat
+            # with v0.1.4 zips. Shipping the proper name removes the
+            # rename-at-install-time dance and lets pip identify the wheel
+            # without us having to crack open the METADATA at runtime.
+            target_name = wheel_src.name
+            if not (target_name.startswith("vllm-") and target_name.endswith(".whl")):
+                # Defensive: caller passed a "vllm.whl"-style file. Fall
+                # back to legacy name so setup.py's compat path picks it up.
+                target_name = "vllm.whl"
+            shutil.copy2(wheel_src, wheels_dir / target_name)
+            print(f"[build] bundled wheel: {wheel_src.name} -> wheels/{target_name}")
 
     # 8. zip
     out_zip.parent.mkdir(parents=True, exist_ok=True)
