@@ -21,6 +21,18 @@ Portable Windows launcher for Qwen3.6-27B inference. Unzip, double-click `start.
 3. Extract anywhere — no admin needed, **including `Program Files` / `Program Files (x86)`**.
 4. Double-click `start.bat`. On first run the launcher auto-discovers existing weights or offers to download Lorbus/Qwen3.6-27B-int4-AutoRound from Hugging Face (~16 GB, public, no token).
 
+## What's new in v0.1.9
+
+Docs-only cleanup ahead of the public launch:
+
+- **README:** the [`docs/AGENT_INSTALL_PROMPT.md`](docs/AGENT_INSTALL_PROMPT.md) hand-off prompt is now linked prominently from the Install section. Edit one line, paste into Claude Code / Cursor / Codex CLI / any agent with shell access, and it does the entire install + smoke test hands-off.
+- **README:** broadened the "works with" client list — any OpenAI-compatible client (Continue, LM Studio, OpenWebUI, etc.), not just agent CLIs.
+- **RELEASING.md:** `devnen/vllm-windows` is public now, so no PAT setup is required to cut a release. The workflow uses `${{ secrets.GITHUB_TOKEN }}` directly.
+- **WINDOWS_VRAM_HEADLESS.md:** genericized the example `taskkill` list.
+- **HALLUCINATED_FLAGS.md / TUNING.md:** softened phrasing about outdated online recipes.
+
+No code or wheel changes — the launcher zip is byte-identical to v0.1.8 except for the bundled docs.
+
 ## What's new in v0.1.4
 
 - **Snapshot logs no longer start with `'vswhere.exe' is not recognized`.** `vcvars64.bat` shells out to `vswhere.exe` with no path qualifier; the VS Installer dir isn't on `PATH` by default. `_common.msvc_env()` now prefixes `C:\Program Files (x86)\Microsoft Visual Studio\Installer` to `PATH` before calling `vcvars64.bat`. Cosmetic fix — the previous version still worked, but the scary first line of every snapshot log made it look broken.
