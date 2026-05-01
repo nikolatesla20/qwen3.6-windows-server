@@ -35,5 +35,8 @@ Thumbs.db
 _local/
 AGENT_NOTES.md
 
+# Cursor conversation exports (/export drops these at repo root)
+20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]-*.txt
+
 # Bundled vLLM wheel — built separately, downloaded at release time
 wheels/vllm*.whl
