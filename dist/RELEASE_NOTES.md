@@ -18,15 +18,20 @@ Portable Windows launcher for Qwen3.6-27B inference. Unzip, double-click `start.
 
 1. Download `qwen3.6-windows-server-portable-x64.zip`.
 2. Verify SHA256 (recommended — see below).
-3. Extract anywhere — no admin needed.
-4. Drop your Qwen3.6-27B INT4 weights into `models\Qwen3.6-27B-int4-AutoRound\`, or set `VLLM_MODEL_DIR`.
-5. Double-click `start.bat`.
+3. Extract anywhere — no admin needed, **including `Program Files` / `Program Files (x86)`**.
+4. Double-click `start.bat`. On first run the launcher auto-discovers existing weights or offers to download Lorbus/Qwen3.6-27B-int4-AutoRound from Hugging Face (~16 GB, public, no token).
+
+## What's new in v0.1.1
+
+- **Truly portable.** The launcher now works from any path including `Program Files (x86)` (parens-safe `start.bat`, embedded-Python `_pth` correctly wired).
+- **Auto-discover model.** Checks env var → saved config → install/models → drive scan; only prompts when nothing is found.
+- **Auto-download.** When prompted, the launcher can fetch the Lorbus quant directly from Hugging Face using only stdlib `urllib` — no token, no `huggingface_hub` install needed. Resume-safe.
+- **Writable-path fallback.** When the install dir is read-only (e.g. real `Program Files`), logs / downloaded models / saved config auto-route to `%LocalAppData%\qwen36-windows-server\`.
+- **Visible errors.** A failure during startup no longer just flashes the cmd window and closes — the error stays on screen with a `Press a key` prompt.
 
 ## SHA256
 
-```
-cda7bed6be1ddd6fc47c65e143ba6b7d6d1b8768e552430deddc54fbb02d9c58  qwen3.6-windows-server-portable-x64.zip
-```
+See `SHA256SUMS.txt` in this release.
 
 PowerShell: `Get-FileHash qwen3.6-windows-server-portable-x64.zip -Algorithm SHA256 | Format-List`.
 
