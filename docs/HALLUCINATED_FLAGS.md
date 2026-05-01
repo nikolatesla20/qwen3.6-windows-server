@@ -47,14 +47,9 @@ How to verify CLI flags:
 
 ## Where the bad info comes from
 
-- **Perplexity / ppx-cli answers about vLLM** are heavily hallucinated.
-  Treat them as "list of candidate flags to grep against the live binary",
-  not as authoritative.
 - **Reddit recipes** often pin a nightly vLLM version that has flags 0.19.0
-  doesn't. Always check which version a recipe was tested on.
+  doesn't.
 - **Linux-only patches** (Genesis, TurboQuant, DFlash drafter) get
-  cross-posted with no caveat. Strip them out before trying anything from
-  the post.
+  cross-posted with no caveat.
 - **`vllm/envs.py` was renamed across versions.** Some attribute names that
-  existed in 0.18 don't in 0.19, and vice versa. Always inspect the live
-  module on your install.
+  existed in 0.18 don't in 0.19, and vice versa.

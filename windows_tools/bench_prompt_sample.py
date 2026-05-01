@@ -29,8 +29,9 @@ The point of the bench is **relative**: do `mem_util=0.948` and
 your prompt class? Cross-machine absolute comparisons are noisy because
 of CPU, disk, and driver-version differences.
 
-For absolute headline-style numbers, run the same bench from one of the
-example threads in `docs/REDDIT_LAUNCH_RESEARCH.md` and use their prompt.
+For absolute headline-style numbers, run the same bench from a published
+recipe (for the same model, same quant, same prompt class) and use their
+prompt.
 """
 
 # Below is a chunk of placeholder content so this file is a valid Python

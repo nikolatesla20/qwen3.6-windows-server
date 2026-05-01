@@ -18,10 +18,10 @@
   / used GTX 1650). Plug your monitors into it, set the 3090 to "high
   performance" / not connected to a display, and you reclaim 1.5-4 GiB on the
   compute card. Works on AMD AM4/AM5 systems that have no iGPU.
-- **On Intel desktop CPUs (LGA1700, UHD 770) you can route the display to
-  the iGPU** for free, same effect as a secondary GPU. Enable iGPU in BIOS,
-  plug the monitor into the motherboard, set the dGPU as "high performance"
-  in Windows graphics settings.
+- **On Intel desktop CPUs with an integrated GPU you can route the display
+  to the iGPU** for free, same effect as a secondary GPU. Enable iGPU in
+  BIOS, plug the monitor into the motherboard, set the dGPU as "high
+  performance" in Windows graphics settings.
 - **WSL2 does NOT free host VRAM.** The GPU is shared with the Windows host
   via GPU-PV; DWM keeps its allocation. You also pay a small CUDA overhead
   inside WSL. Use WSL2 for Linux-only software, not for VRAM relief.
@@ -106,10 +106,10 @@ WDDM driver tax even with zero apps open. Everything above that is
 
 ### 1. Move display to iGPU (Intel desktop CPUs only) — ~2-4 GiB freed, free
 
-If you're on LGA1700 (12th/13th/14th gen Core) or LGA1851 (Core Ultra 200S),
-your CPU has UHD 770 / Xe-LP integrated graphics. AMD desktop CPUs without
-the `G` suffix (5800X, 7700X, 9800X3D, etc.) **do not have an iGPU** —
-skip to workaround #2.
+If your Intel desktop CPU has an integrated GPU (most non-`F` SKUs from
+12th gen onward), you can route the display to it. AMD desktop CPUs
+without the `G` suffix (5800X, 7700X, 9800X3D, etc.) **do not have an
+iGPU** — skip to workaround #2.
 
 Procedure:
 
@@ -138,14 +138,16 @@ Procedure:
 
 Caveats:
 
-- **Refresh rate**: UHD 770 caps at 4K@60 Hz. A 4K@120/144 Hz monitor
-  drops to 60 Hz on the iGPU. At 1440p you can reach ~165 Hz over DP.
+- **Refresh rate**: most desktop iGPUs cap at 4K@60 Hz, so a 4K@120/144 Hz
+  monitor drops to 60 Hz when run off the iGPU. At 1440p most can still
+  reach 120-165 Hz over DisplayPort. Check your specific iGPU's spec
+  sheet before relying on it for high-refresh gaming.
 - **HDR**: HDR10 works but tone-mapping is weaker than the 3090's;
   Auto HDR in particular feels sluggish. 10-bit color further reduces
   the max refresh rate.
-- **Multi-monitor**: UHD 770 supports up to 4 displays in spec, but most
-  motherboards only expose 2 ports (1× HDMI + 1× DP). For 3+ monitors,
-  see workaround #2.
+- **Multi-monitor**: modern Intel iGPUs support up to 4 displays in spec,
+  but most motherboards only expose 2 ports (1× HDMI + 1× DP). For 3+
+  monitors, see workaround #2.
 - **NVENC / hardware encoding** for OBS, streaming, and video editors
   still runs on the 3090 — that does not move with the cable.
 - **Cross-adapter composition**: if any app explicitly renders on the
@@ -353,7 +355,7 @@ the display driver, CUDA stops working too.
   └─ Free:  disable HW accel in Chrome/Teams/Office (#3) + close apps (#4)
             then start_gpu0 profile, expect 16-32k context for 27B INT4.
 
-1× 24 GB GPU, display attached, Intel CPU with UHD 770
+1× 24 GB GPU, display attached, Intel CPU with iGPU
   └─ Best:  route display to iGPU in BIOS + Windows graphics settings (#1).
             Free, ~3 GiB reclaimed.
 
@@ -376,26 +378,6 @@ Want truly headless like Linux
   └─ Dual-boot Linux, or repurpose an old box as a Linux inference server.
             No supported Windows path gets you there on consumer GeForce.
 ```
-
-## Sources
-
-Research conducted late April 2026 against Reddit (r/LocalLLaMA, r/nvidia,
-r/buildapc), NVIDIA developer forums, Microsoft Learn, and Perplexity
-synthesised search. Key threads consulted:
-
-- NVIDIA dev forum: "TCC mode on RTX 4090?" — repeated NVIDIA staff
-  confirmation that TCC is not supported on GeForce, multiple driver
-  generations.
-- r/LocalLLaMA: many threads on "free up VRAM on display GPU Windows" all
-  converging on the iGPU / second-GPU recommendation.
-- Microsoft Learn: WDDM driver model docs confirming framebuffer
-  reservation while a display device is enumerated.
-- WSL CUDA docs (docs.nvidia.com / learn.microsoft.com): GPU-PV
-  architecture explanation confirming shared host GPU.
-- r/nvidia threads on `dwm.exe` respawn behavior post-Win10 1903.
-- Multiple build threads on r/buildapc confirming GT 1030 / RX 6400 as
-  display-only secondary cards alongside a 3090/4090 with no driver
-  conflicts on Win11 23H2 / 24H2.
 
 If you find a workaround not listed here that actually moves the needle,
 please open an issue on `devnen/vllm-windows` with `nvidia-smi` before/
