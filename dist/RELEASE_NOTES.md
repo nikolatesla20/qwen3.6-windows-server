@@ -21,6 +21,10 @@ Portable Windows launcher for Qwen3.6-27B inference. Unzip, double-click `start.
 3. Extract anywhere — no admin needed, **including `Program Files` / `Program Files (x86)`**.
 4. Double-click `start.bat`. On first run the launcher auto-discovers existing weights or offers to download Lorbus/Qwen3.6-27B-int4-AutoRound from Hugging Face (~16 GB, public, no token).
 
+## What's new in v0.1.2
+
+- **Bundled Windows Terminal.** A portable Windows Terminal is shipped under `terminal/` and `start.bat` automatically launches the TUI inside it — no separate install required, no Microsoft Store, works on Windows 10. Falls back gracefully to plain `cmd` if the bundle is missing.
+
 ## What's new in v0.1.1
 
 - **Truly portable.** The launcher now works from any path including `Program Files (x86)` (parens-safe `start.bat`, embedded-Python `_pth` correctly wired).

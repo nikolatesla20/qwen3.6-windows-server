@@ -39,8 +39,14 @@ REM Open inside Windows Terminal if available — the launcher's TUI looks
 REM much better there than in legacy cmd. Skip if already inside WT.
 if defined WT_SESSION goto :run
 if defined VLLM_NO_WT goto :run
+REM Prefer the bundled portable Windows Terminal that ships in the release
+REM zip (..\terminal\WindowsTerminal.exe). Fall back to a system install
+REM under Program Files if the user happens to have one. If neither is
+REM present, just run in the current cmd window.
 set "WT_EXE="
-if exist "C:\Program Files\WindowsTerminal\wt.exe" set "WT_EXE=C:\Program Files\WindowsTerminal\wt.exe"
+if exist "%REPO_ROOT%\terminal\WindowsTerminal.exe" set "WT_EXE=%REPO_ROOT%\terminal\WindowsTerminal.exe"
+if not defined WT_EXE if exist "%APP_ROOT%\terminal\WindowsTerminal.exe" set "WT_EXE=%APP_ROOT%\terminal\WindowsTerminal.exe"
+if not defined WT_EXE if exist "C:\Program Files\WindowsTerminal\wt.exe" set "WT_EXE=C:\Program Files\WindowsTerminal\wt.exe"
 if not defined WT_EXE if exist "C:\Program Files\WindowsTerminal\WindowsTerminal.exe" set "WT_EXE=C:\Program Files\WindowsTerminal\WindowsTerminal.exe"
 if not defined WT_EXE goto :run
 "!WT_EXE!" -w vllm-launcher new-tab -d "%APP_ROOT%" --title "vLLM Launcher" cmd /c """%~f0""" %*

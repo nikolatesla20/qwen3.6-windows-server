@@ -37,7 +37,7 @@ GET_PIP_URL = "https://bootstrap.pypa.io/get-pip.py"
 
 LAUNCHER_DEPS = ["textual>=0.86", "rich", "httpx", "pyyaml"]
 TOP_FILES = ["LICENSE", "README.md", "CITATION.cff"]
-TOP_DIRS = ["launcher", "snapshots", "windows_tools", "docs"]
+TOP_DIRS = ["launcher", "snapshots", "windows_tools", "docs", "terminal"]
 
 REPO = Path(__file__).resolve().parent.parent
 
