@@ -38,11 +38,18 @@ set "PYTHONPATH=%APP_ROOT%"
 REM Open inside Windows Terminal if available — the launcher's TUI looks
 REM much better there than in legacy cmd. Skip if already inside WT, or
 REM if the caller is running in headless / scripted mode (--headless,
-REM --snapshot, --auto-download). Relaunching into a new WT window would
-REM detach from the parent shell and break automation.
+REM --snapshot, --auto-download, --setup-only). Relaunching into a new WT
+REM window would detach from the parent shell and break automation —
+REM the parent process exits 0 with no captured output and the user is
+REM left wondering what happened. Detect common non-interactive parents
+REM (CI runners, git-bash, MSYS, anywhere TERM is set) and stay in-place.
 if defined WT_SESSION goto :run
 if defined VLLM_NO_WT goto :run
-echo.%*| findstr /I /C:"--headless" /C:"--snapshot" /C:"--auto-download" /C:"--model-dir" /C:" -y " /C:"--yes" >nul && goto :run
+if defined CI goto :run
+if defined GITHUB_ACTIONS goto :run
+if defined MSYSTEM goto :run
+if defined TERM goto :run
+echo.%*| findstr /I /C:"--headless" /C:"--snapshot" /C:"--auto-download" /C:"--model-dir" /C:"--setup-only" /C:" -y " /C:"--yes" >nul && goto :run
 REM Prefer the bundled portable Windows Terminal that ships in the release
 REM zip (..\terminal\WindowsTerminal.exe). Fall back to a system install
 REM under Program Files if the user happens to have one. If neither is

@@ -38,6 +38,13 @@ Every snapshot below has the tool-calling fix baked in (PR #35687 + #40861 + `qw
 | `start_pp2_160k` (2 GPU) | 43.5      | long (100 KB)     | 160 k   | Pipeline-parallel for the largest contexts. |
 | `start_gpu0_50k`      | volatile     | mixed             | 9–50 k  | Single-GPU, monitor plugged into the same card. |
 
+> **GPU index note.** `start_72tps`, `start_speed`, `start_127k`, and
+> `start_mtp4` pin to **GPU 1** so GPU 0 stays free for the desktop
+> compositor and other apps on a 2× 3090 box. On a single-GPU host the
+> snapshot detects that via `nvidia-smi` and falls back to GPU 0 with a
+> warning, but for a tuned single-GPU run use `start_gpu0_50k` directly.
+> `start_pp2_160k` requires two GPUs.
+
 Long-prompt rows were measured on a ~100 KB / ~24 k-token Python
 source-summary prompt (a real Windows-service module fed to
 `windows_tools\bench_summarize.py`). The short-prompt row was measured
@@ -75,7 +82,18 @@ This launcher is the third option:
 
 ## Install
 
-**The path:**
+**TL;DR for CI / agents / scripted installs** — one line, no TUI:
+
+```powershell
+start.bat --auto-download --snapshot start_72tps
+```
+
+That installs the runtime, downloads the model if missing, and starts
+serving on `http://127.0.0.1:5001/v1`. See
+[Headless / scripted install](#headless--scripted-install) below for
+all the flags.
+
+**Interactive path:**
 
 1. Download [`qwen3.6-windows-server-portable-x64.zip`](../../releases/latest)
    from the latest Release. Extract anywhere (no admin needed).
@@ -86,9 +104,12 @@ This launcher is the third option:
      etc.) install into the embedded Python's `site-packages`. A
      marker file is written so subsequent launches skip this entirely.
    - **Model setup.** Looks for `Qwen3.6-27B-int4-AutoRound` weights
-     on your fixed drives. If it doesn't find them, offers to
+     on your fixed drives (scans `<drive>:\`, `_models\`, `models\`,
+     `AI\`, `AI\models\`, `huggingface\`, `huggingface\hub\`,
+     `models\Lorbus\`). If it doesn't find them, offers to
      **auto-download from Hugging Face** (~16 GB, public, no token)
-     or accepts a path to weights you already have.
+     or accepts a path to weights you already have. If your weights
+     live somewhere else, pass `--model-dir <path>` to skip the scan.
 3. Pick a snapshot, press Enter, you're serving on
    `http://127.0.0.1:5001/v1`.
 
@@ -124,6 +145,17 @@ don't have to know what the model is called.
 > `content: null` plus `finish_reason: "length"` — the server is fine,
 > the budget was just too small. 1500–2000 is a safe floor for short Q&A.
 
+> **Where's the answer in the response?** The final answer lands in
+> `choices[0].message.content`. The chain-of-thought lands in a separate
+> `choices[0].message.reasoning` field — that's the `--reasoning-parser=qwen3`
+> wheel patch doing its job, not a bug. Most chat clients show
+> `content` and ignore `reasoning`; if yours doesn't, point it at
+> `content`.
+
+> **If the request hangs**, tail `logs\vllm_server.<port>.log` for vLLM's
+> own stdout — the parent launcher logs only the boot banner; the
+> serving process tees its progress to that file.
+
 ## Headless / scripted install
 
 End-to-end automated install (no TUI, no prompts) — useful for CI,
@@ -141,8 +173,20 @@ snapshot — all without opening the TUI. Other useful flags:
 
 ```powershell
 start.bat --model-dir G:\_models\Qwen3.6-27B-int4-AutoRound --snapshot start_speed
-start.bat --headless     :: just run setup checks, then exit
+start.bat --headless     :: skip TUI, run the default snapshot (start_72tps)
+start.bat --setup-only   :: install runtime + model, then exit (no serving)
 ```
+
+`--headless` without `--snapshot` now runs the default snapshot
+(`start_72tps`) instead of exiting after setup checks. To run only
+the setup checks (the old `--headless` behavior), pass `--setup-only`.
+
+The launcher also stays in the parent terminal — instead of detaching
+into a new Windows Terminal window — when it sees any of `WT_SESSION`,
+`VLLM_NO_WT`, `CI`, `GITHUB_ACTIONS`, `MSYSTEM`, or `TERM` in the
+environment. That covers GitHub Actions, git-bash, MSYS, agent
+runners, and anything that exports `TERM`. So your captured stdout
+won't go missing.
 
 For benchmark numbers like the table above, use the bundled tools:
 

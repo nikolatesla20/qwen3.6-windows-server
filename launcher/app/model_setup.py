@@ -60,9 +60,22 @@ HF_RESOLVE_TMPL = f"https://huggingface.co/{REPO_ID}/resolve/main/{{path}}"
 def _scan_fixed_drives() -> list[Path]:
     """Look for a `Qwen3.6-27B-int4-AutoRound` folder on the obvious places.
 
-    Cheap: only checks <drive>:\\ and <drive>:\\_models\\ — does not walk
-    full trees. Designed to find the folder a user already has from a
-    previous download without lighting the disk on fire.
+    Cheap: only checks a fixed list of likely parent directories on each
+    drive — does not walk full trees. Designed to find the folder a user
+    already has from a previous download without lighting the disk on
+    fire. The candidate layouts cover what users actually do in practice:
+
+      <drive>:\\<target>                                  (dropped at root)
+      <drive>:\\_models\\<target>                         (common convention)
+      <drive>:\\models\\<target>                          (HF / generic)
+      <drive>:\\AI\\<target>                              (catch-all)
+      <drive>:\\AI\\models\\<target>                      (nested catch-all)
+      <drive>:\\huggingface\\<target>                     (HF cache root)
+      <drive>:\\huggingface\\hub\\<target>                (HF hub default)
+      <drive>:\\models\\Lorbus\\<target>                  (HF org-prefixed)
+
+    Update this list when reports come in of a layout we missed; the
+    cost of a few extra `Path.exists()` probes is negligible.
     """
     hits: list[Path] = []
     target = paths.DEFAULT_MODEL_DIRNAME
@@ -75,6 +88,10 @@ def _scan_fixed_drives() -> list[Path]:
         candidates.append(root / "_models" / target)
         candidates.append(root / "models" / target)
         candidates.append(root / "AI" / target)
+        candidates.append(root / "AI" / "models" / target)
+        candidates.append(root / "huggingface" / target)
+        candidates.append(root / "huggingface" / "hub" / target)
+        candidates.append(root / "models" / "Lorbus" / target)
     for c in candidates:
         try:
             if paths.looks_like_model_dir(c):

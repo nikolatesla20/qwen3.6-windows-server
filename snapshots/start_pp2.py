@@ -24,7 +24,7 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-from _common import VENV, VLLM_EXE, MODEL_PATH, VCVARS, msvc_env, log_path_for, enhanced_jinja_path
+from _common import VENV, VLLM_EXE, MODEL_PATH, VCVARS, msvc_env, log_path_for, enhanced_jinja_path, resolve_cuda_visible_devices
 SERVED_NAME = "qwen3.6-27b-autoround"
 HOST = "0.0.0.0"
 PORT = 5002  # baseline 72-tok/s server owns 5001
@@ -77,7 +77,7 @@ def main() -> int:
     if not Path(ENHANCED_JINJA).exists():
         print(f"[ERROR] enhanced jinja template not found: {ENHANCED_JINJA}", file=sys.stderr)
         return 1
-    env["CUDA_VISIBLE_DEVICES"] = "0,1"
+    env["CUDA_VISIBLE_DEVICES"] = resolve_cuda_visible_devices("0,1", 2)
     env["VLLM_SLEEP_WHEN_IDLE"] = "1"
     env["VLLM_ENABLE_CUDAGRAPH_GC"] = "1"
     env["VLLM_USE_FLASHINFER_SAMPLER"] = "1"

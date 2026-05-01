@@ -20,7 +20,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 # Reuse the existing Windows vLLM install so this folder stays rollbackable.
-from _common import VENV, VLLM_EXE, MODEL_PATH, VCVARS, msvc_env, log_path_for, enhanced_jinja_path
+from _common import VENV, VLLM_EXE, MODEL_PATH, VCVARS, msvc_env, log_path_for, enhanced_jinja_path, resolve_cuda_visible_devices
 SERVED_NAME = "qwen3.6-27b-autoround"
 HOST = "0.0.0.0"
 PORT = 5001  # different from vllm-windows (5000), so both can coexist if needed
@@ -80,7 +80,7 @@ def main() -> int:
     _world = TP * PP
     # GPU1 only when single-card (leaves GPU0 free for display/other work);
     # both cards when TP/PP > 1.
-    env["CUDA_VISIBLE_DEVICES"] = "0,1" if _world > 1 else "1"
+    env["CUDA_VISIBLE_DEVICES"] = resolve_cuda_visible_devices("1", _world)
     env["VLLM_SLEEP_WHEN_IDLE"] = "1"
     env["VLLM_ENABLE_CUDAGRAPH_GC"] = "1"
     env["VLLM_USE_FLASHINFER_SAMPLER"] = "1"

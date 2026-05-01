@@ -18,6 +18,8 @@ SNAPSHOT_NAMES = (
     "start_gpu0_50k",
 )
 
+DEFAULT_HEADLESS_SNAPSHOT = "start_72tps"
+
 
 def _resolve_snapshot(name: str) -> Path:
     """Map a snapshot name to its .py launcher under <install>/snapshots/."""
@@ -60,7 +62,10 @@ def main() -> None:
     p.add_argument("--snapshot", metavar="NAME",
                    help=f"Skip TUI and launch one of: {', '.join(SNAPSHOT_NAMES)}")
     p.add_argument("--headless", action="store_true",
-                   help="Skip the TUI even without --snapshot (just runs setup checks).")
+                   help=("Skip the TUI. Without --snapshot or --setup-only, "
+                         f"runs the default snapshot ({DEFAULT_HEADLESS_SNAPSHOT})."))
+    p.add_argument("--setup-only", action="store_true",
+                   help="Run runtime + model setup checks then exit. Implies --headless.")
     p.add_argument("--auto-download", action="store_true",
                    help="When the model is missing, download from Hugging Face without prompting.")
     p.add_argument("--model-dir", metavar="PATH",
@@ -80,9 +85,10 @@ def main() -> None:
         Server(command=cmd, host=args.host, port=args.port, title="vLLM Launcher").serve()
         return
 
-    # In headless / snapshot modes the user is running unattended — bail
-    # loudly on missing prereqs instead of dropping to the TUI fallback.
-    headless = args.headless or bool(args.snapshot)
+    # In headless / snapshot / setup-only modes the user is running
+    # unattended — bail loudly on missing prereqs instead of dropping to
+    # the TUI fallback.
+    headless = args.headless or bool(args.snapshot) or args.setup_only
 
     if not args.skip_runtime_check:
         try:
@@ -113,13 +119,20 @@ def main() -> None:
                 input("\nPress Enter to exit...")
             sys.exit(1)
 
+    if args.setup_only:
+        print("\n[launcher] --setup-only: runtime + model are ready. Exiting.")
+        return
+
     if args.snapshot:
         snap = _resolve_snapshot(args.snapshot)
         sys.exit(_exec_snapshot(snap))
 
     if args.headless:
-        print("\n[launcher] --headless and no --snapshot; runtime + model are ready. Exiting.")
-        return
+        print(f"\n[launcher] --headless without --snapshot; running default "
+              f"snapshot {DEFAULT_HEADLESS_SNAPSHOT}. "
+              f"Pass --setup-only to run setup checks then exit.")
+        snap = _resolve_snapshot(DEFAULT_HEADLESS_SNAPSHOT)
+        sys.exit(_exec_snapshot(snap))
 
     LauncherApp().run()
 
