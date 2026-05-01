@@ -33,3 +33,6 @@ Thumbs.db
 
 # Local-only notes (drafts, reddit posts, scratchpads — never pushed)
 _local/
+
+# Bundled vLLM wheel — built separately, downloaded at release time
+wheels/vllm*.whl

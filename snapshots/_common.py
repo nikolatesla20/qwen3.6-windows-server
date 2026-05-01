@@ -16,8 +16,30 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-VENV = Path(os.environ.get("VLLM_WINDOWS_VENV", str(REPO_ROOT / "venv")))
-VLLM_EXE = VENV / "Scripts" / "vllm.exe"
+def _resolve_vllm_exe() -> tuple[Path, Path]:
+    """Resolve (PYTHON_HOME, VLLM_EXE).
+
+    Resolution order:
+      1. ``VLLM_WINDOWS_VENV`` env var → expects ``Scripts/vllm.exe`` and
+         ``Scripts/python.exe`` underneath (developer / external venv).
+      2. ``REPO_ROOT/venv/Scripts/vllm.exe`` (developer checkout).
+      3. ``REPO_ROOT/python/Scripts/vllm.exe`` (portable release: vllm
+         is installed directly into the embedded Python's site-packages
+         by ``launcher/app/setup.py``, which writes the entry-point exe
+         under ``python/Scripts/``).
+    """
+    env = os.environ.get("VLLM_WINDOWS_VENV")
+    if env:
+        root = Path(env)
+        return root, root / "Scripts" / "vllm.exe"
+    dev_venv = REPO_ROOT / "venv"
+    if (dev_venv / "Scripts" / "vllm.exe").exists():
+        return dev_venv, dev_venv / "Scripts" / "vllm.exe"
+    embedded = REPO_ROOT / "python"
+    return embedded, embedded / "Scripts" / "vllm.exe"
+
+
+VENV, VLLM_EXE = _resolve_vllm_exe()
 
 MODEL_PATH = os.environ.get(
     "VLLM_MODEL_DIR",

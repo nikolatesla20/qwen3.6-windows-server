@@ -49,7 +49,10 @@ if not defined WT_EXE if exist "%APP_ROOT%\terminal\WindowsTerminal.exe" set "WT
 if not defined WT_EXE if exist "C:\Program Files\WindowsTerminal\wt.exe" set "WT_EXE=C:\Program Files\WindowsTerminal\wt.exe"
 if not defined WT_EXE if exist "C:\Program Files\WindowsTerminal\WindowsTerminal.exe" set "WT_EXE=C:\Program Files\WindowsTerminal\WindowsTerminal.exe"
 if not defined WT_EXE goto :run
-"!WT_EXE!" -w vllm-launcher new-tab -d "%APP_ROOT%" --title "vLLM Launcher" cmd /c """%~f0""" %*
+REM Hide this cmd window before launching WT (matches portable-launcher pattern).
+powershell -NoProfile -Command "Add-Type -MemberDefinition '[DllImport(\"kernel32.dll\")] public static extern IntPtr GetConsoleWindow(); [DllImport(\"user32.dll\")] public static extern bool ShowWindow(IntPtr h,int c);' -Name W -Namespace V; [V.W]::ShowWindow([V.W]::GetConsoleWindow(),0)" >nul 2>&1
+"!WT_EXE!" -w vllm-launcher new-tab -d "!APP_ROOT!" --title "vLLM Launcher" cmd /c """%~f0""" %*
+start /b "" "!PYTHON!" "!APP_ROOT!\activate_wt.py" "vLLM Launcher" >nul 2>&1
 exit /b 0
 
 :run

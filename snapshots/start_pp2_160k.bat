@@ -12,15 +12,8 @@ set PYTHONIOENCODING=utf-8
 REM Both GPUs exposed; start_pp2_ngram.py sets this again to be explicit.
 set CUDA_VISIBLE_DEVICES=0,1
 
-REM Relaunch inside Windows Terminal if available so vLLM output is visible.
-if not defined WT_SESSION (
-    set "WT_EXE=C:\Program Files\WindowsTerminal\wt.exe"
-    if exist "!WT_EXE!" (
-        "!WT_EXE!" -d "%~dp0." cmd /k """%~f0"""
-        exit /b 0
-    )
-)
-
-if "%VLLM_WINDOWS_VENV%"=="" set "VLLM_WINDOWS_VENV=%~dp0..\venv"
-"%VLLM_WINDOWS_VENV%\Scripts\python.exe" -u "%~dp0start_pp2_ngram.py"
+set "PY=%VLLM_WINDOWS_VENV%\Scripts\python.exe"
+if "%VLLM_WINDOWS_VENV%"=="" set "PY=%~dp0..\venv\Scripts\python.exe"
+if not exist "%PY%" set "PY=%~dp0..\python\python.exe"
+"%PY%" -u "%~dp0start_pp2_ngram.py"
 endlocal

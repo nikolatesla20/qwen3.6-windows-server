@@ -37,7 +37,7 @@ GET_PIP_URL = "https://bootstrap.pypa.io/get-pip.py"
 
 LAUNCHER_DEPS = ["textual>=0.86", "rich", "httpx", "pyyaml"]
 TOP_FILES = ["LICENSE", "README.md", "CITATION.cff"]
-TOP_DIRS = ["launcher", "snapshots", "windows_tools", "docs", "terminal"]
+TOP_DIRS = ["launcher", "snapshots", "windows_tools", "docs", "terminal", "templates"]
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -76,16 +76,20 @@ def main() -> int:
     txt = pth.read_text(encoding="utf-8")
     if "Lib\\site-packages" not in txt:
         txt = txt.rstrip() + "\nLib\\site-packages\n"
-    if "..\\launcher" not in txt:
-        # Insert right after the first '.' line so it has high priority.
-        lines = txt.splitlines()
-        for i, line in enumerate(lines):
-            if line.strip() == ".":
-                lines.insert(i + 1, "..\\launcher")
-                break
-        else:
-            lines.append("..\\launcher")
-        txt = "\n".join(lines) + "\n"
+    # Embedded python ._pth fully owns sys.path — the script's directory
+    # is NOT auto-added the way it is for a normal Python install. We
+    # need ..\launcher (so `python -m app` works) AND ..\snapshots
+    # (so snapshot scripts can `from _common import ...`).
+    for extra in ("..\\launcher", "..\\snapshots"):
+        if extra not in txt:
+            lines = txt.splitlines()
+            for i, line in enumerate(lines):
+                if line.strip() == ".":
+                    lines.insert(i + 1, extra)
+                    break
+            else:
+                lines.append(extra)
+            txt = "\n".join(lines) + "\n"
     if "import site" in txt and "#import site" in txt:
         txt = txt.replace("#import site", "import site")
     elif "import site" not in txt:
@@ -132,16 +136,28 @@ def main() -> int:
     # ship the user-facing start.bat at top level
     shutil.copy2(REPO / "launcher" / "start.bat", build / "start.bat")
 
-    # 7b. optionally bundle the patched vLLM wheel under wheels/
+    # 7b. optionally bundle the patched vLLM wheel under wheels/.
+    # Always ship a normalized "vllm.whl" plus a vendored get-pip.py so
+    # launcher/app/setup.py can bootstrap the runtime offline-ish (only
+    # the actual torch + dep wheels need to be fetched at first run).
+    wheels_dir = build / "wheels"
+    wheels_dir.mkdir(exist_ok=True)
+    # Reuse the get-pip we already downloaded in step 4, plus copy the
+    # repo-tracked one if a developer dropped it under wheels/.
+    repo_get_pip = REPO / "wheels" / "get-pip.py"
+    if repo_get_pip.exists():
+        shutil.copy2(repo_get_pip, wheels_dir / "get-pip.py")
+    elif get_pip.exists():
+        shutil.copy2(get_pip, wheels_dir / "get-pip.py")
     if args.wheel:
         wheel_src = Path(args.wheel)
         if not wheel_src.exists():
             print(f"[build] WARNING: --wheel {wheel_src} not found; skipping bundle", file=sys.stderr)
         else:
-            wheels_dir = build / "wheels"
-            wheels_dir.mkdir(exist_ok=True)
-            shutil.copy2(wheel_src, wheels_dir / wheel_src.name)
-            print(f"[build] bundled wheel: {wheel_src.name}")
+            # Snapshot scripts and setup.py both look for "vllm.whl" so the
+            # filename is decoupled from the version embedded inside.
+            shutil.copy2(wheel_src, wheels_dir / "vllm.whl")
+            print(f"[build] bundled wheel: {wheel_src.name} -> wheels/vllm.whl")
 
     # 8. zip
     out_zip.parent.mkdir(parents=True, exist_ok=True)

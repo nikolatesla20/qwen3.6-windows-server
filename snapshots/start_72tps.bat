@@ -9,16 +9,9 @@ cd /d "%~dp0"
 set PYTHONUNBUFFERED=1
 set PYTHONIOENCODING=utf-8
 
-REM Relaunch inside Windows Terminal if available so vLLM output is visible.
-if not defined WT_SESSION (
-    set "WT_EXE=C:\Program Files\WindowsTerminal\wt.exe"
-    if exist "!WT_EXE!" (
-        "!WT_EXE!" -d "%~dp0." cmd /k """%~f0"""
-        exit /b 0
-    )
-)
+set "PY=%VLLM_WINDOWS_VENV%\Scripts\python.exe"
+if "%VLLM_WINDOWS_VENV%"=="" set "PY=%~dp0..\venv\Scripts\python.exe"
+if not exist "%PY%" set "PY=%~dp0..\python\python.exe"
 
-if "%VLLM_WINDOWS_VENV%"=="" set "VLLM_WINDOWS_VENV=%~dp0..\venv"
-
-"%VLLM_WINDOWS_VENV%\Scripts\python.exe" -u "%~dp0start_72tps.py"
+"%PY%" -u "%~dp0start_72tps.py"
 endlocal

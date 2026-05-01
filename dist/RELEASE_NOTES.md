@@ -21,6 +21,14 @@ Portable Windows launcher for Qwen3.6-27B inference. Unzip, double-click `start.
 3. Extract anywhere — no admin needed, **including `Program Files` / `Program Files (x86)`**.
 4. Double-click `start.bat`. On first run the launcher auto-discovers existing weights or offers to download Lorbus/Qwen3.6-27B-int4-AutoRound from Hugging Face (~16 GB, public, no token).
 
+## What's new in v0.1.3
+
+- **First-run runtime installer.** The portable zip ships the launcher, the patched vLLM wheel (~200 MB), a vendored `get-pip.py`, and an embedded Python — but NOT the ~6 GB of transitive deps (torch + CUDA wheels + ~150 Python packages). On first launch, `setup.py` bootstraps pip, then installs the bundled wheel + deps into the embedded Python's `site-packages`. One-time, ~5–15 min, several-GB download. A marker file makes subsequent launches no-ops. Honest scope: previous releases claimed "every dependency preinstalled" — that wasn't true and pressing Enter on a snapshot would crash with `ModuleNotFoundError: vllm`.
+- **Snapshot scripts now find the embedded Python.** `_common.py` resolves `VLLM_EXE` to `<install>\python\Scripts\vllm.exe` when no developer venv is present. Each `start_*.bat` falls back to `..\python\python.exe` when `..\venv\` doesn't exist.
+- **WT relaunch fixed for installs under `Program Files (x86)`.** `start.bat` now matches the working `portable-launcher` pattern (delayed expansion + triple-quote `cmd /c` + `activate_wt.py` foreground bring-up + `ShowWindow(0)` to hide the parent cmd). The previous space-padded form interacted badly with parens in the install path.
+- **Bundled jinja chat template.** `templates/qwen3.5-enhanced.jinja` now ships in the zip — earlier builds shipped only when paired with the `vllm-windows` repo checkout.
+- **Removed the `start_toolcall` snapshot + harness.** Every snapshot now ships with the tool-calling fix baked in (`qwen3.5-enhanced.jinja` + `preserve_thinking=false`), so a separate config is redundant.
+
 ## What's new in v0.1.2
 
 - **Bundled Windows Terminal.** A portable Windows Terminal is shipped under `terminal/` and `start.bat` automatically launches the TUI inside it — no separate install required, no Microsoft Store, works on Windows 10. Falls back gracefully to plain `cmd` if the bundle is missing.

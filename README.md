@@ -27,9 +27,10 @@ ships inside the launcher zip.
 
 On a single RTX 3090 (24 GB), running [Lorbus AutoRound INT4](https://huggingface.co/Lorbus/Qwen3.6-27B-int4-AutoRound):
 
+Every snapshot below has the tool-calling fix baked in (PR #35687 + #40861 + `qwen3.5-enhanced.jinja` + `preserve_thinking=false`), so any one of them works for Cline / Cursor / Codex CLI / OpenWebUI — just point at the listed port.
+
 | Snapshot              | Decode tok/s | Prompt class      | Context | Use it when |
 |-----------------------|--------------|-------------------|---------|-------------|
-| `start_toolcall`      | parser-pinned | tool-calling apps | 64 k    | **Agentic / tool-calling apps** (Cline, Cursor, Codex CLI, OpenWebUI). Patched parsers (PR #35687 + #40861) + `qwen3.5-enhanced.jinja` + `preserve_thinking=false`. Verified 8/8 on `windows_tools\test_toolcall.py`. Port 5005. |
 | `start_72tps`         | **~72**      | short (~200 tok)  | 32 k    | Short-prompt / chat baseline. MTP n=3. |
 | `start_speed`         | **64.5**     | long (100 KB)     | 90 k    | Default for long prompts. MTP n=6 — see note below. |
 | `start_127k`          | 53.4         | long (100 KB)     | 127 k   | Maximum context on a single 3090. |
@@ -74,21 +75,28 @@ This launcher is the third option:
 
 ## Install
 
-**The 60-second path:**
+**The path:**
 
 1. Download [`qwen3.6-windows-server-portable-x64.zip`](../../releases/latest)
    from the latest Release. Extract anywhere (no admin needed).
-2. Double-click `start.bat`. On first run the launcher looks for the
-   Qwen3.6-27B-int4-AutoRound weights — if it can't find them, it
-   offers to **auto-download from Hugging Face** (~16 GB, public, no
-   token needed) or accepts a path to weights you already have. The
-   choice is saved, so subsequent launches go straight to the TUI.
+2. Double-click `start.bat`. The first run does two one-time steps,
+   then drops you in the TUI:
+   - **Runtime install** (~5–15 min, several GB). The bundled vLLM
+     wheel + ~150 transitive deps (torch, CUDA wheels, transformers,
+     etc.) install into the embedded Python's `site-packages`. A
+     marker file is written so subsequent launches skip this entirely.
+   - **Model setup.** Looks for `Qwen3.6-27B-int4-AutoRound` weights
+     on your fixed drives. If it doesn't find them, offers to
+     **auto-download from Hugging Face** (~16 GB, public, no token)
+     or accepts a path to weights you already have.
 3. Pick a snapshot, press Enter, you're serving on
    `http://127.0.0.1:5001/v1`.
 
-The portable zip ships with an embedded Python 3.12 runtime and every
-dependency preinstalled. No `pip install`, no `conda`, no internet
-needed at install time, no registry changes, no admin prompts.
+The portable zip ships with an embedded Python 3.12 runtime, the
+patched vLLM wheel, the launcher TUI, a portable Windows Terminal,
+and a vendored `get-pip.py`. No conda, no system-Python install, no
+registry changes, no admin prompts. The runtime install on first run
+is the only network-dependent step besides the model download.
 
 Don't have the model yet? See [`docs/MTP_HEAD.md`](docs/MTP_HEAD.md) —
 **use the Lorbus AutoRound quant**, the others won't draft.
