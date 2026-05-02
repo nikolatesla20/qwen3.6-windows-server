@@ -34,6 +34,11 @@ from pathlib import Path
 PY_VERSION = "3.12.7"  # last 3.12 release with embed-amd64 zip
 PY_EMBED_URL = f"https://www.python.org/ftp/python/{PY_VERSION}/python-{PY_VERSION}-embed-amd64.zip"
 GET_PIP_URL = "https://bootstrap.pypa.io/get-pip.py"
+# NuGet python package ships tools/include/ + tools/libs/ that the embed zip
+# omits. Triton's JIT (runtime/build.py) needs Python.h and python312.lib to
+# compile cuda_utils.c on first model load; without them vLLM dies on the
+# first request with `include file 'Python.h' not found`. See issue #1.
+PY_NUGET_URL = f"https://globalcdn.nuget.org/packages/python.{PY_VERSION}.nupkg"
 
 LAUNCHER_DEPS = ["textual>=0.86", "rich", "httpx", "pyyaml"]
 TOP_FILES = ["LICENSE", "README.md", "CITATION.cff"]
@@ -69,6 +74,36 @@ def main() -> int:
     download(PY_EMBED_URL, embed_zip)
     with zipfile.ZipFile(embed_zip) as zf:
         zf.extractall(py_dir)
+
+    # 2b. Overlay Include/ and libs/ from the NuGet python package. The
+    # embed zip strips both, but Triton's JIT compile of cuda_utils.c
+    # needs Python.h (Include/) and python312.lib (libs/). Without this,
+    # the first model load fails with the registry-inspect error chain
+    # documented in issue #1.
+    nuget_pkg = work / "python-nuget.nupkg"
+    download(PY_NUGET_URL, nuget_pkg)
+    with zipfile.ZipFile(nuget_pkg) as zf:
+        for name in zf.namelist():
+            # tools/include/* -> python/Include/*
+            # tools/libs/*    -> python/libs/*
+            if name.startswith("tools/include/") and not name.endswith("/"):
+                rel = name[len("tools/include/"):]
+                dst = py_dir / "Include" / rel
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                with zf.open(name) as src, open(dst, "wb") as out:
+                    shutil.copyfileobj(src, out)
+            elif name.startswith("tools/libs/") and not name.endswith("/"):
+                rel = name[len("tools/libs/"):]
+                dst = py_dir / "libs" / rel
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                with zf.open(name) as src, open(dst, "wb") as out:
+                    shutil.copyfileobj(src, out)
+    # Sanity: refuse to ship a zip without these.
+    if not (py_dir / "Include" / "Python.h").is_file():
+        raise RuntimeError("NuGet overlay failed: python/Include/Python.h missing")
+    if not (py_dir / "libs" / "python312.lib").is_file():
+        raise RuntimeError("NuGet overlay failed: python/libs/python312.lib missing")
+    print("[build] overlaid Python Include/ + libs/ from NuGet package")
 
     # 3. enable site-packages in ._pth + add ..\launcher so `python -m app`
     # works without relying on PYTHONPATH (embedded distros ignore it).

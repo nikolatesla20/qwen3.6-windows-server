@@ -48,6 +48,11 @@ LEGACY_WHEEL_FILENAME = "vllm.whl"  # back-compat with v0.1.4 release zips
 GET_PIP_VENDORED_NAME = "get-pip.py"
 GET_PIP_URL = "https://bootstrap.pypa.io/get-pip.py"
 TORCH_INDEX = "https://download.pytorch.org/whl/cu126"
+# NuGet python package ships the C headers (Include/) and import libs
+# (libs/python312.lib) that python.org's embeddable distribution strips.
+# Triton's JIT needs both to compile cuda_utils.c at first model load.
+# See issue #1: pre-v0.1.12 release zips ship without them.
+PY_NUGET_URL_TMPL = "https://globalcdn.nuget.org/packages/python.{ver}.nupkg"
 
 # ~6 GB of wheels download + extracted site-packages. Used for the
 # preflight free-space check; not load-bearing if shutil.disk_usage fails.
@@ -193,6 +198,102 @@ def _download_get_pip() -> Path:
     return dest
 
 
+def _ensure_python_headers() -> None:
+    """Ensure python\\Include\\ and python\\libs\\ exist next to the embed.
+
+    The embeddable Python 3.12 zip from python.org strips both, but
+    Triton's runtime/build.py needs Python.h (from Include/) and
+    python312.lib (from libs/) to JIT-compile cuda_utils.c on the first
+    model load. Without them, vLLM dies trying to inspect the model
+    architecture.
+
+    Build-time fix lives in windows_tools/build_launcher_zip.py and bakes
+    the headers into the release zip directly. This runtime path
+    self-heals existing v0.1.x installs that shipped before that build
+    fix landed: download the NuGet python package, extract tools/include
+    and tools/libs into the embed root.
+
+    No-op when the headers are already present (re-extracted release
+    zip, dev checkout against a real Python install, etc.). Best-effort
+    on failure: prints a hint pointing to the manual workaround in
+    docs/TROUBLESHOOTING.md and lets the caller continue. The wheel
+    install can still succeed; the user just hits the JIT failure on
+    first inference instead of here.
+    """
+    py_home = _embedded_python().parent
+    have_h = (py_home / "Include" / "Python.h").is_file()
+    have_lib = (py_home / "libs" / "python312.lib").is_file()
+    if have_h and have_lib:
+        return
+
+    import platform
+    py_ver = platform.python_version()  # e.g. "3.12.7"
+    if not py_ver.startswith("3.12."):
+        # Patch version doesn't have to match exactly, but the minor
+        # version must. If we're somehow on a non-3.12 embed, bail
+        # rather than overlay mismatched headers.
+        print(f"  [warn] Python {py_ver} unexpected; skipping header self-heal.")
+        return
+
+    print()
+    print("[setup] Embedded Python is missing C headers (Include/) and import libs (libs/).")
+    print("        Triton needs both to JIT-compile its CUDA helpers on first model load.")
+    print(f"        Downloading the NuGet python.{py_ver} package to overlay them.")
+
+    url = PY_NUGET_URL_TMPL.format(ver=py_ver)
+    cache_root = paths.writable_root() / WHEEL_DIR_NAME
+    cache_root.mkdir(parents=True, exist_ok=True)
+    nupkg = cache_root / f"python-{py_ver}.nupkg"
+
+    try:
+        if not nupkg.is_file() or nupkg.stat().st_size < 1_000_000:
+            print(f"        GET {url}")
+            req = urllib.request.Request(url, headers={"User-Agent": "qwen36-launcher/1.0"})
+            with urllib.request.urlopen(req, timeout=120) as r, open(nupkg, "wb") as fh:
+                shutil.copyfileobj(r, fh)
+    except (urllib.error.URLError, OSError) as e:
+        print(f"  [warn] could not download NuGet python package: {e}")
+        print("         Manual fix: see docs/TROUBLESHOOTING.md row 'Triton fails to JIT-compile'.")
+        return
+
+    import zipfile
+    try:
+        with zipfile.ZipFile(nupkg) as zf:
+            for name in zf.namelist():
+                if name.endswith("/"):
+                    continue
+                if name.startswith("tools/include/"):
+                    dst = py_home / "Include" / name[len("tools/include/"):]
+                elif name.startswith("tools/libs/"):
+                    dst = py_home / "libs" / name[len("tools/libs/"):]
+                else:
+                    continue
+                try:
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    with zf.open(name) as src, open(dst, "wb") as out:
+                        shutil.copyfileobj(src, out)
+                except OSError as e:
+                    # Hit when install root is read-only (Program Files
+                    # without admin). Bail loudly so the user knows to
+                    # extract elsewhere or run as admin once.
+                    print(f"  [error] cannot write {dst}: {e}")
+                    print("          Re-extract the launcher to a writable location")
+                    print("          (Desktop, Documents, C:\\Tools\\, etc.) and try again.")
+                    return
+    except zipfile.BadZipFile:
+        print(f"  [warn] downloaded NuGet package is corrupt: {nupkg}")
+        try:
+            nupkg.unlink()
+        except OSError:
+            pass
+        return
+
+    if (py_home / "Include" / "Python.h").is_file() and (py_home / "libs" / "python312.lib").is_file():
+        print("[setup] Python headers + libs installed.")
+    else:
+        print("  [warn] header overlay finished but Python.h / python312.lib still missing.")
+
+
 def _bootstrap_pip() -> None:
     src = _vendored_get_pip() or _download_get_pip()
     print(f"  Bootstrapping pip via {src.name} ...")
@@ -284,6 +385,11 @@ def ensure_runtime() -> None:
     mismatch and reinstall — without that check, the old vLLM stays in
     site-packages forever.
     """
+    # Self-heal missing Python C headers / import libs before doing
+    # anything else. Cheap when already present; one HTTP GET + a small
+    # extract on existing v0.1.x installs that shipped without them.
+    _ensure_python_headers()
+
     wheel = _wheel_path()
     bundled_sha = _sha256_file(wheel) if wheel and wheel.is_file() else None
     marker = _read_marker()
