@@ -15,8 +15,8 @@
 ## What this is
 
 A small portable Windows app that gives you an OpenAI-compatible API
-serving Qwen3.6-27B locally, with config presets that we actually
-measured ourselves. The launcher is a Textual TUI: arrow keys, Enter
+serving Qwen3.6-27B locally, with config presets that I actually
+measured myself. The launcher is a Textual TUI: arrow keys, Enter
 to start a snapshot, Esc to stop. That's the whole UX.
 
 It is the matching launcher for the [`devnen/vllm-windows`](https://github.com/devnen/vllm-windows)
@@ -54,7 +54,7 @@ lie.
 
 > **Why MTP n=6 on `start_speed`?** n=3 is the universal *short-prompt*
 > sweet spot and ships as `start_72tps`. On long, dense Python source
-> the acceptance curve shifts later, n=6 won our coherence sweep
+> the acceptance curve shifts later, n=6 won my coherence sweep
 > (n=3 / 4 / 5 / 6 / 7 / 8 → 53.4 / 58.3 / 62.8 / 64.5 / 61.5 / 58.0
 > tok/s; full sweep in [`docs/TUNING.md`](docs/TUNING.md)). Always
 > re-sweep on a representative prompt for your workload.
@@ -220,7 +220,7 @@ running apps; use the `start_gpu0_50k` snapshot, and read
 [`docs/WINDOWS_VRAM_HEADLESS.md`](docs/WINDOWS_VRAM_HEADLESS.md) for the
 free-up-VRAM playbook.
 
-If you're on a 4090 or 5090, expect higher numbers than ours. If you're
+If you're on a 4090 or 5090, expect higher numbers than mine. If you're
 on something more exotic, nothing here is going to work without your own
 tuning, that's fine, please share what you find.
 
@@ -257,7 +257,7 @@ inside this launcher's portable zip.
 - [`docs/UNINSTALL.md`](docs/UNINSTALL.md), clean removal (it's portable, so just delete folders).
 - [`docs/HARDWARE.md`](docs/HARDWARE.md), what works, what doesn't, and why.
 - [`docs/COHERENCE.md`](docs/COHERENCE.md), degenerate-output guide and the 3-tier validator.
-- [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md), every failure mode we've hit.
+- [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md), every failure mode I've hit.
 - [`docs/TUNING.md`](docs/TUNING.md), the lever set, anti-levers, how to sweep your own configs.
 - [`docs/MTP_HEAD.md`](docs/MTP_HEAD.md), why Lorbus AutoRound is the only INT4 quant that works.
 - [`docs/SPEC_DECODE_MATRIX.md`](docs/SPEC_DECODE_MATRIX.md), what spec-decode + parallelism combos work.
