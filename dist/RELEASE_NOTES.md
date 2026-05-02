@@ -21,6 +21,16 @@ Portable Windows launcher for Qwen3.6-27B inference. Unzip, double-click `start.
 3. Extract anywhere, no admin needed, **including `Program Files` / `Program Files (x86)`**.
 4. Double-click `start.bat`. On first run the launcher auto-discovers existing weights or offers to download Lorbus/Qwen3.6-27B-int4-AutoRound from Hugging Face (~16 GB, public, no token).
 
+## What's new in v0.1.16
+
+The other half of the flashinfer story v0.1.15 missed:
+
+- **`FileNotFoundError [WinError 2]` from `flashinfer/jit/cpp_ext.py:run_ninja` during `profile_run`.** vLLM's sampler honors `VLLM_USE_FLASHINFER_SAMPLER=1` by JIT-compiling a flashinfer sampling module on the first `profile_run` call. That JIT shells out to ninja, then to `cl.exe`. If MSVC 2022 or ninja is missing, EngineCore dies before the server boots. v0.1.15 set the flashinfer env var unconditionally to `1`, which crashed any setup without MSVC. v0.1.16 adds `flashinfer_sampler_env()` in `snapshots/_common.py` that probes whether MSVC env is usable AND ninja is on PATH, and toggles `VLLM_USE_FLASHINFER_SAMPLER` accordingly. The PyTorch fallback sampler is slightly slower but never JIT-compiles anything, so boots succeed on a vanilla Windows install. Install MSVC 2022 Build Tools + `pip install ninja` if you want the small boost back.
+
+Reported by kadeshar in issue #2; thanks for the full log.
+
+TUNING.md no longer lists `VLLM_USE_FLASHINFER_SAMPLER=1` as a "no downside" env var. TROUBLESHOOTING.md gets a new row for the run_ninja failure.
+
 ## What's new in v0.1.15
 
 One bug, exposed by v0.1.14 finally letting boot get this far:
