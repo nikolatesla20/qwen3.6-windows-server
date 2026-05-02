@@ -270,7 +270,7 @@ class LauncherApp(App):
 
     def action_launch_web(self) -> None:
         from .serve import start_web_server
-        command = f'"{sys.executable}" -m vllm_launcher'
+        command = f'"{sys.executable}" -m app'
         try:
             url = start_web_server(command=command, title=self.TITLE, port=8765)
         except ImportError:

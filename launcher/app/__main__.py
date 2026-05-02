@@ -81,7 +81,7 @@ def main() -> None:
 
     if args.cmd == "serve":
         from textual_serve.server import Server
-        cmd = f'"{sys.executable}" -m vllm_launcher'
+        cmd = f'"{sys.executable}" -m app'
         Server(command=cmd, host=args.host, port=args.port, title="vLLM Launcher").serve()
         return
 

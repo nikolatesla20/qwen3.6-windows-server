@@ -15,7 +15,7 @@ Steps:
   2. Extract to <build>/python/.
   3. Edit python312._pth to enable site-packages.
   4. Bootstrap pip via get-pip.py (one-shot, into the embed).
-  5. pip install textual rich httpx pyyaml ninja --target python\\Lib\\site-packages.
+  5. pip install textual textual-serve rich httpx pyyaml ninja --target python\\Lib\\site-packages.
      ninja's executable lands at python\\Lib\\site-packages\\bin\\ninja.exe;
      snapshots/_common.py prepends that dir to PATH at module import so
      flashinfer's JIT and ``shutil.which("ninja")`` both find it.
@@ -43,7 +43,7 @@ GET_PIP_URL = "https://bootstrap.pypa.io/get-pip.py"
 # first request with `include file 'Python.h' not found`. See issue #1.
 PY_NUGET_URL = f"https://globalcdn.nuget.org/packages/python.{PY_VERSION}.nupkg"
 
-LAUNCHER_DEPS = ["textual>=0.86", "rich", "httpx", "pyyaml", "ninja"]
+LAUNCHER_DEPS = ["textual>=0.86", "textual-serve", "rich", "httpx", "pyyaml", "ninja"]
 TOP_FILES = ["LICENSE", "README.md", "CITATION.cff"]
 TOP_DIRS = ["launcher", "snapshots", "windows_tools", "docs", "terminal", "templates"]
 

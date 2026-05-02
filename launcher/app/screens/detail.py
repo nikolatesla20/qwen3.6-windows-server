@@ -281,7 +281,10 @@ class DetailScreen(Screen):
         cfg = self.cfg
         port = cfg.port
         served = self.bundle.shared_defaults.get("served_model_name", "qwen3.6-27b-autoround")
-        self.app.notify("Testing inference...", timeout=2)
+        self.app.notify(
+            "Benchmarking decode tok/s (300-token transformer-attention prompt)...",
+            timeout=8,
+        )
         self.app.run_worker(
             lambda: self._test_blocking(port, served),
             thread=True, exclusive=True,
@@ -290,11 +293,21 @@ class DetailScreen(Screen):
     def _test_blocking(self, port: int, served: str) -> None:
         try:
             from .. import inference
-            result = inference.test_chat(port, model=served)
+
+            def _on_progress(n: int) -> None:
+                self.app.call_from_thread(
+                    self.app.notify,
+                    f"Benchmarking... {n}/300 tokens decoded",
+                    timeout=4,
+                )
+
+            result = inference.test_chat(
+                port, model=served, on_progress=_on_progress,
+            )
             if not result.get("ok"):
                 self.app.call_from_thread(
                     self.app.push_screen,
-                    ResultModal("Test failed", f"[#f85149]{result.get('error','?')}[/]"),
+                    ResultModal("Benchmark failed", f"[#f85149]{result.get('error','?')}[/]"),
                 )
                 return
 
@@ -308,23 +321,35 @@ class DetailScreen(Screen):
 
             ttft = _fmt(result.get("ttft_s"), ".2f")
             total = _fmt(result.get("total_s"), ".2f")
+            decode_window = _fmt(result.get("decode_window_s"), ".2f")
             decode = _fmt(result.get("decode_tps"), ".1f")
-            text = result.get("text") or "[i #8b949e](empty response)[/]"
+            wall = _fmt(result.get("wall_tps"), ".1f")
+            text = (result.get("text") or "").strip() or "[i #8b949e](empty response)[/]"
+            preview = text if len(text) <= 600 else text[:600].rstrip() + " […]"
             body = (
-                f"[b]Response:[/] {text}\n\n"
-                f"[#8b949e]prompt_tokens:[/] {result.get('prompt_tokens', 0)}\n"
+                f"[b #3fb950]decode tok/s: {decode}[/]   "
+                f"[#8b949e]wall tok/s:[/] {wall}\n\n"
+                f"[#8b949e]prompt_tokens:[/]     {result.get('prompt_tokens', 0)}\n"
                 f"[#8b949e]completion_tokens:[/] {result.get('completion_tokens', 0)}\n"
-                f"[#8b949e]TTFT:[/] {ttft}s\n"
-                f"[#8b949e]total:[/] {total}s\n"
-                f"[b #3fb950]decode tok/s: {decode}[/]"
+                f"[#8b949e]TTFT:[/]              {ttft}s   [#6e7681](prefill cost)[/]\n"
+                f"[#8b949e]decode window:[/]     {decode_window}s\n"
+                f"[#8b949e]total wall:[/]        {total}s\n\n"
+                f"[b]Response preview:[/]\n{preview}\n\n"
+                f"[#6e7681]Same prompt and metric as windows_tools\\bench.py — "
+                f"compare directly against published numbers.[/]"
             )
             self.app.call_from_thread(
-                self.app.push_screen, ResultModal(f"Test → {self.cfg.id}", body)
+                self.app.notify,
+                f"Benchmark complete: {decode} decode tok/s",
+                timeout=6,
+            )
+            self.app.call_from_thread(
+                self.app.push_screen, ResultModal(f"Benchmark → {self.cfg.id}", body)
             )
         except Exception as e:
             import traceback
             tb = traceback.format_exc()
             self.app.call_from_thread(
                 self.app.push_screen,
-                ResultModal("Test crashed", f"[#f85149]{e}[/]\n\n[#8b949e]{tb}[/]"),
+                ResultModal("Benchmark crashed", f"[#f85149]{e}[/]\n\n[#8b949e]{tb}[/]"),
             )

@@ -21,6 +21,13 @@ Portable Windows launcher for Qwen3.6-27B inference. Unzip, double-click `start.
 3. Extract anywhere, no admin needed, **including `Program Files` / `Program Files (x86)`**.
 4. Double-click `start.bat`. On first run the launcher auto-discovers existing weights or offers to download Lorbus/Qwen3.6-27B-int4-AutoRound from Hugging Face (~16 GB, public, no token).
 
+## What's new in v0.1.18
+
+Two TUI fixes so users don't have to drop to a command line for things the launcher should already do:
+
+- **Test button now runs the same benchmark as `windows_tools/bench.py`.** Previously it sent a one-line "What is 2+2?" with `max_tokens=50`, which gives a noisy decode tok/s number that doesn't match anything published. The Test button now uses the 300-word transformer-attention prose prompt with `max_tokens=300` and reports TTFT, decode window, decode tok/s, and wall tok/s, the same fields `bench.py` prints. A live progress toast updates as tokens stream in (`Benchmarking... N/300 tokens decoded`), and the result modal includes a response preview plus a note that the number is directly comparable to the published headlines. No need to open cmd, set `VLLM_BENCH_BASE`, and run `python windows_tools\bench.py` separately.
+- **Web UI (Ctrl-W) actually works.** `textual-serve` is now in `LAUNCHER_DEPS`, so the embedded Python ships with it instead of erroring out with "textual-serve not installed". Also fixed the spawned-child command in `app.py` and `__main__.py`, both said `-m vllm_launcher` (a module that does not exist) instead of `-m app`. The Web UI binding now opens a browser on `http://localhost:8765` and serves the same TUI to a remote machine.
+
 ## What's new in v0.1.17
 
 Two follow-ups to v0.1.16's flashinfer-sampler fix:
