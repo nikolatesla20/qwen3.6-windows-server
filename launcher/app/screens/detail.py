@@ -1,10 +1,20 @@
 from __future__ import annotations
+import re
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen, ModalScreen
 from textual.widgets import Header, Footer, Static, Button
 
 from ..config import WinConfig
+
+
+_MARKUP_RE = re.compile(r"\[/?[^\[\]]*\]")
+
+
+def _strip_markup(text: str) -> str:
+    """Remove Textual / Rich markup tags so the result pastes cleanly into
+    a GitHub issue or Reddit comment."""
+    return _MARKUP_RE.sub("", text)
 
 
 class ConfirmModal(ModalScreen[bool]):
@@ -42,18 +52,33 @@ class ResultModal(ModalScreen[None]):
         background: #161b22;
         border: solid #58a6ff;
         padding: 1 2;
-        width: 90;
-        height: 80%;
+        width: 95%;
+        height: 90%;
         layout: vertical;
     }
-    #body-scroll { height: 1fr; }
-    #box Button { margin-top: 1; }
+    #title { height: 1; margin-bottom: 1; }
+    #body-scroll {
+        height: 1fr;
+        background: #0d1117;
+        border: solid #30363d;
+        padding: 0 1;
+    }
+    #button-row {
+        height: 3;
+        margin-top: 1;
+        align: left middle;
+    }
+    #button-row Button {
+        margin-right: 1;
+        min-width: 16;
+        height: 3;
+    }
     """
 
     BINDINGS = [
         ("escape", "dismiss_modal", "Close"),
-        ("enter", "dismiss_modal", "Close"),
         ("q", "dismiss_modal", "Close"),
+        ("c", "copy_body", "Copy"),
     ]
 
     def __init__(self, title: str, body: str):
@@ -63,16 +88,29 @@ class ResultModal(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="box"):
-            yield Static(f"[b #58a6ff]{self.title_str}[/]\n")
+            yield Static(f"[b #58a6ff]{self.title_str}[/]", id="title")
             with VerticalScroll(id="body-scroll"):
                 yield Static(self.body)
-            yield Button("Close (Esc)", id="close", variant="primary")
+            with Horizontal(id="button-row"):
+                yield Button("Copy (C)", id="copy", variant="success")
+                yield Button("Close (Esc)", id="close", variant="primary")
 
     def on_button_pressed(self, ev: Button.Pressed) -> None:
-        self.dismiss(None)
+        if ev.button.id == "copy":
+            self.action_copy_body()
+        else:
+            self.dismiss(None)
 
     def action_dismiss_modal(self) -> None:
         self.dismiss(None)
+
+    def action_copy_body(self) -> None:
+        plain = _strip_markup(f"{self.title_str}\n\n{self.body}")
+        try:
+            self.app.copy_to_clipboard(plain)
+            self.app.notify("Copied to clipboard", timeout=3)
+        except Exception as e:
+            self.app.notify(f"Copy failed: {e}", severity="error", timeout=5)
 
 
 def _kv(rows: list[tuple[str, str]]) -> str:
