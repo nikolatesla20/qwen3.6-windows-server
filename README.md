@@ -156,8 +156,10 @@ server is reliable; you just leave a few percent of decode tok/s on
 the table. The launcher prints a one-line `[info]` at startup telling
 you which path it picked.
 
-Get the Build Tools here:
-https://visualstudio.microsoft.com/downloads/?q=build+tools
+Get the Build Tools installer here (official Microsoft `aka.ms`
+shortlink, pinned to VS 2022 / 17.x so it stays on the right product
+even after VS 2026 ships):
+https://aka.ms/vs/17/release/vs_buildtools.exe
 
 ninja (the other half of the JIT toolchain) ships inside the
 launcher zip, you don't need to install it separately.
