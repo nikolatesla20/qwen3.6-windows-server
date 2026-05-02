@@ -45,7 +45,6 @@ provide. Even with a CUDA 13 wheel this may be the next wall.
 
 ## Probably won't work without effort
 
-- Windows Server (no Windows Terminal by default, TUI works in cmd but is uglier)
 - Pascal / Turing GPUs, sm_86 minimum. Pascal lacks BF16 in hardware
   (the Lorbus AutoRound MTP head is BF16, won't load) and INT4 Marlin
   kernels need compute capability 8.0 or higher. The wheel itself
