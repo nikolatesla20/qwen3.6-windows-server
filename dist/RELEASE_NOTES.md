@@ -21,6 +21,15 @@ Portable Windows launcher for Qwen3.6-27B inference. Unzip, double-click `start.
 3. Extract anywhere, no admin needed, **including `Program Files` / `Program Files (x86)`**.
 4. Double-click `start.bat`. On first run the launcher auto-discovers existing weights or offers to download Lorbus/Qwen3.6-27B-int4-AutoRound from Hugging Face (~16 GB, public, no token).
 
+## What's new in v0.1.17
+
+Two follow-ups to v0.1.16's flashinfer-sampler fix:
+
+- **ninja now ships inside the launcher zip.** Added to `LAUNCHER_DEPS` in `windows_tools/build_launcher_zip.py`. `pip install --target` puts the executable at `python\Lib\site-packages\bin\ninja.exe`; `snapshots/_common.py` prepends that dir to `PATH` at module import so `shutil.which("ninja")` and flashinfer's JIT child processes both find it. Users no longer need to `pip install ninja` into the embedded Python to enable the flashinfer sampler boost.
+- **README.md gains an "Optional: install MSVC 2022 for the small decode boost" section.** Calls out that the launcher works without MSVC, and explains what installing the free Build Tools ("Desktop development with C++" workload) buys: the snapshots auto-detect MSVC and flip on the flashinfer sampler path. Cost is the ~7 GB Build Tools download plus a one-time JIT compile on first launch. With ninja bundled, the Build Tools install is now the only extra step.
+
+TUNING.md and TROUBLESHOOTING.md updated to match.
+
 ## What's new in v0.1.16
 
 The other half of the flashinfer story v0.1.15 missed:
