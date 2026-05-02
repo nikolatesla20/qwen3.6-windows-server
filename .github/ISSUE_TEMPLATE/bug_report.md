@@ -11,8 +11,8 @@ labels: bug
 
 ## Hardware + OS
 
-- GPU(s) — model and driver version (`nvidia-smi -q | head -25`)
-- Windows build (`winver` — paste the build number)
+- GPU(s), model and driver version (`nvidia-smi -q | head -25`)
+- Windows build (`winver`, paste the build number)
 - CPU + RAM (relevant only for very large prefills)
 - Single GPU? Is the display attached to it?
 
@@ -35,7 +35,7 @@ vLLM version (`python -c "import vllm; print(vllm.__version__)"`):
 ## Logs
 
 Paste the boot section of `logs\vllm_server.<port>.log` (first ~50 lines)
-plus the last ~50 lines around the failure. Don't worry about size — we'd
+plus the last ~50 lines around the failure. Don't worry about size, we'd
 rather have too much than too little.
 
 ```

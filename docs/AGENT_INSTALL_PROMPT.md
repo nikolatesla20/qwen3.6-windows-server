@@ -5,13 +5,13 @@ Code, Cursor, Codex CLI, etc.) on a Windows machine with a CUDA-capable
 NVIDIA GPU. The agent does the entire install hands-off and reports
 back when inference works.
 
-Edit the `INSTALL_DIR` line before sending — everything else is generic.
+Edit the `INSTALL_DIR` line before sending, everything else is generic.
 
 ---
 
 ```text
 Install qwen3.6-windows-server (latest release) end-to-end on this Windows
-machine and verify it serves inference. This is hands-off — complete every
+machine and verify it serves inference. This is hands-off, complete every
 step yourself, do not ask me to drive a TUI.
 
 INSTALL_DIR: C:\path\to\install        # <-- EDIT THIS LINE before sending
@@ -27,7 +27,7 @@ recent CUDA driver. Won't work on Pascal/Turing/Intel Arc/AMD.
    ~16 GB, runtime is ~5 GB, plus pip cache + temp).
 
 2. Create INSTALL_DIR if missing. Use the GitHub API to find the latest
-   release zip URL — don't hardcode a tag, the project ships fixes
+   release zip URL, don't hardcode a tag, the project ships fixes
    regularly:
 
       curl -sL https://api.github.com/repos/devnen/qwen3.6-windows-server/releases/latest \
@@ -40,7 +40,7 @@ recent CUDA driver. Won't work on Pascal/Turing/Intel Arc/AMD.
 
 3. Launch headlessly. The launcher is a Textual TUI by default but has
    full CLI flags. From bash, you must invoke the .bat through
-   `cmd.exe` with an absolute path — relative paths and bare `start.bat`
+   `cmd.exe` with an absolute path, relative paths and bare `start.bat`
    don't resolve across the bash->cmd boundary:
 
       cmd.exe //c 'C:\absolute\path\to\qwen3.6-windows-server\start.bat \
@@ -61,7 +61,7 @@ recent CUDA driver. Won't work on Pascal/Turing/Intel Arc/AMD.
      in-place rather than detaching into Windows Terminal, so the bash
      environment is fine. (`VLLM_NO_WT=1` is belt-and-suspenders if you
      want it.)
-   - DO NOT trust the bash background-task "completed" signal — cmd.exe
+   - DO NOT trust the bash background-task "completed" signal, cmd.exe
      returns once the script chain detaches, but the python.exe children
      keep installing and serving for several minutes after. Poll the log
      and the HTTP endpoint, not the spawn handle.
@@ -74,7 +74,7 @@ recent CUDA driver. Won't work on Pascal/Turing/Intel Arc/AMD.
      (`vLLM serve: qwen3.6-27b-autoround`) followed eventually by
      `Application startup complete.`
    The vLLM serving process additionally tees its own stdout to
-   `$INSTALL_DIR/qwen3.6-windows-server/logs/vllm_server.5001.log` —
+   `$INSTALL_DIR/qwen3.6-windows-server/logs/vllm_server.5001.log`,
    tail that for engine-side progress.
 
 5. Wait for the server to actually accept requests. Poll, don't guess:
@@ -98,7 +98,7 @@ recent CUDA driver. Won't work on Pascal/Turing/Intel Arc/AMD.
    Parse the response. The answer "Paris" lands in
    `choices[0].message.content`. Chain-of-thought lands in
    `choices[0].message.reasoning` (that's the `--reasoning-parser=qwen3`
-   patch, not a bug). `max_tokens: 2000` matters — Qwen3.6 is a thinking
+   patch, not a bug). `max_tokens: 2000` matters, Qwen3.6 is a thinking
    model and `max_tokens: 50` will be eaten by the thinking phase, leaving
    `content: null` with `finish_reason: "length"`.
 
@@ -106,14 +106,14 @@ recent CUDA driver. Won't work on Pascal/Turing/Intel Arc/AMD.
 
 - HTTP GET `http://127.0.0.1:5001/v1/models` returns 200.
 - The smoke-test POST returns "Paris" in `content` (or in `reasoning`
-  if the wheel happens to leave it there — accept either).
+  if the wheel happens to leave it there, accept either).
 - The launcher log shows a single `[model] using <path>  (source: ...)`
   line and you can report which directory was used.
 
 ## On failure
 
 - Read `docs/TROUBLESHOOTING.md` inside the extracted folder before
-  improvising — most failure modes (KV cache OOM, wrong attention
+  improvising, most failure modes (KV cache OOM, wrong attention
   backend, port-in-use, tokenizer class mismatch) are pre-diagnosed
   there with exact fixes.
 - Do not try to "fix" things by editing files inside the extracted

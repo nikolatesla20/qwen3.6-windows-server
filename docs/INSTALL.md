@@ -2,19 +2,19 @@
 
 Three paths, in order of how much you have to do.
 
-## 1. Portable launcher zip — recommended
+## 1. Portable launcher zip, recommended
 
 For users who just want it to run.
 
 1. Open the latest [Release](../../../releases). Download:
-   - `qwen3.6-windows-server-portable-x64.zip` — the launcher with bundled Python AND bundled patched wheel.
+   - `qwen3.6-windows-server-portable-x64.zip`, the launcher with bundled Python AND bundled patched wheel.
    - `SHA256SUMS.txt`.
 2. Verify checksums (optional but recommended):
    ```powershell
    Get-FileHash *.zip, *.whl -Algorithm SHA256
    ```
    Compare against `SHA256SUMS.txt`.
-3. Extract the launcher zip anywhere — no admin needed, fully relocatable.
+3. Extract the launcher zip anywhere, no admin needed, fully relocatable.
 4. Either set `VLLM_MODEL_DIR` to point at your existing Qwen3.6 weights, or
    download the model into the bundled `models\Qwen3.6-27B-int4-AutoRound\`
    folder.
@@ -26,7 +26,7 @@ For users who just want it to run.
      the patches automatically.
    - Optional one-click coherence check after the server boots.
 
-## 2. Wheel-only — for users with their own venv
+## 2. Wheel-only, for users with their own venv
 
 If you already manage Python environments and just want the patched wheel:
 
@@ -52,11 +52,11 @@ $env:VLLM_MODEL_DIR    = "G:\_models\Qwen3.6-27B-int4-AutoRound"
 .\snapshots\start_speed.bat
 ```
 
-## 3. From source — only if you must
+## 3. From source, only if you must
 
 The patched source tree in this fork is what produces the wheel. Build
 follows SystemPanic's [original instructions](https://github.com/SystemPanic/vllm-windows#building-from-source)
-verbatim — we don't change the build system. CUDA 12.6, MSVC 2022,
+verbatim, we don't change the build system. CUDA 12.6, MSVC 2022,
 PyTorch 2.11.0+cu126. Expect 2–4 hours on a 5950X-class machine.
 
 ## After install: first-run sanity
@@ -94,5 +94,5 @@ python windows_tools\patch_tokenizer.py  G:\_models\Qwen3.6-27B-int4-AutoRound
 fast-but-degenerate output. `patch_tokenizer.py` flips the `tokenizer_class`
 from Lorbus's custom `TokenizersBackend` (which transformers 4.57 doesn't
 recognise on Windows) to `Qwen2Tokenizer`. A `.bak` is preserved; the patch
-is idempotent. **Re-run after every fresh download** — HF redownloads
+is idempotent. **Re-run after every fresh download**, HF redownloads
 overwrite the patched copy.

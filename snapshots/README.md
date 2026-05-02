@@ -1,12 +1,12 @@
 # Snapshots
 
-Each `start_*.py` is a frozen, validated config — one knob set, one set of
+Each `start_*.py` is a frozen, validated config, one knob set, one set of
 measured numbers. Each `start_*.bat` is a one-line wrapper that resolves
 the venv via `%VLLM_WINDOWS_VENV%` and launches the corresponding `.py`.
 
 ## When to use which
 
-All snapshots ship with the tool-calling fix (patched wheel PR #35687 + #40861, `qwen3.5-enhanced.jinja`, `preserve_thinking=false`) — verified 8/8 on `windows_tools\test_toolcall.py`. Pick one based on speed / context tradeoff; any of them works for Cline, Cursor, Codex CLI, OpenWebUI.
+All snapshots ship with the tool-calling fix (patched wheel PR #35687 + #40861, `qwen3.5-enhanced.jinja`, `preserve_thinking=false`), verified 8/8 on `windows_tools\test_toolcall.py`. Pick one based on speed / context tradeoff; any of them works for Cline, Cursor, Codex CLI, OpenWebUI.
 
 | Snapshot | Decode tok/s | Ctx | When |
 |---|---|---|---|
@@ -45,7 +45,7 @@ into the default location) and everything else resolves automatically.
 4. Add a card under `windows.configs[]` in `launcher\configs.yaml`.
 5. Bench, validate coherence, commit.
 
-Try not to parameterise via env vars within a snapshot — the whole point
+Try not to parameterise via env vars within a snapshot, the whole point
 is that each snapshot is self-describing and rollback-able. A new config
 is a new file.
 

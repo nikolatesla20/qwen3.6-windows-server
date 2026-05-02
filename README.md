@@ -212,17 +212,35 @@ Tuned and measured on:
 - 2× NVIDIA RTX 3090 (Ampere `sm_86`), no NVLink, PCIe Gen 4
 - 350 W power cap (250 W also benchmarked, see [`docs/TUNING.md`](docs/TUNING.md))
 
-Should also work on any Ampere or newer NVIDIA GPU running Windows 10/11,
-3090, 4090, 5090, A6000, etc. **Will not work** on Pascal, Turing,
-Intel Arc, or any AMD card. **Single GPU with the display attached**
-loses 1–3 GiB of VRAM to the desktop compositor and another 2–5 GiB to
-running apps; use the `start_gpu0_50k` snapshot, and read
+Should also work on any Ampere or Ada NVIDIA GPU running Windows 10/11,
+3090, 4090, A6000, etc. **Will not work** on Pascal, Turing, Intel Arc,
+or any AMD card. **Single GPU with the display attached** loses 1–3 GiB
+of VRAM to the desktop compositor and another 2–5 GiB to running apps;
+use the `start_gpu0_50k` snapshot, and read
 [`docs/WINDOWS_VRAM_HEADLESS.md`](docs/WINDOWS_VRAM_HEADLESS.md) for the
 free-up-VRAM playbook.
 
-If you're on a 4090 or 5090, expect higher numbers than mine. If you're
-on something more exotic, nothing here is going to work without your own
-tuning, that's fine, please share what you find.
+> **RTX 50-series (Blackwell, 5060 / 5070 / 5080 / 5090): not in this
+> wheel yet.** The bundled `vllm-0.19.0+devnen.1` is built against CUDA
+> 12.6 / PyTorch cu126 which has no sm_120 kernels, so the engine fails
+> at boot with `cudaErrorNoKernelImageForDevice`. SystemPanic shipped
+> `vllm-windows v0.20.0` (CUDA 13, Ampere + Blackwell, NCCL TP/PP on
+> Windows) on 2026-04-30; the rebase onto that wheel is tracked
+> separately. In the meantime, Blackwell users can either use
+> [jaMMint's WSL2 vllm-blackwell-guide](https://github.com/lastloop-ai/vllm-blackwell-guide)
+> (~120 tok/s on 5090, pays the WSL tax) or wait for the Blackwell
+> branch of this project.
+
+If you're on a 4090, expect slightly higher numbers than mine. If
+you're on something more exotic, nothing here is going to work without
+your own tuning, that's fine, please share what you find.
+
+> **Scope.** This launcher serves Qwen3.6-27B specifically through a
+> fixed set of validated snapshots. It is not a general vLLM server you
+> can point at any model. Adding configs for smaller Qwen variants is
+> straightforward (see [`snapshots/README.md`](snapshots/README.md));
+> running unrelated models like ACE-Step, Stable Diffusion, or other
+> diffusion / multimodal stacks is out of scope.
 
 ## The local-AI ethos
 
@@ -256,6 +274,7 @@ inside this launcher's portable zip.
 - [`docs/CLAUDE_CODE.md`](docs/CLAUDE_CODE.md), point Claude Code at the local server (native `/v1/messages`, no proxy).
 - [`docs/UNINSTALL.md`](docs/UNINSTALL.md), clean removal (it's portable, so just delete folders).
 - [`docs/HARDWARE.md`](docs/HARDWARE.md), what works, what doesn't, and why.
+- [`docs/COMPARISON.md`](docs/COMPARISON.md), how this stacks up against Ollama, LM Studio, llama.cpp, Docker, and WSL2.
 - [`docs/COHERENCE.md`](docs/COHERENCE.md), degenerate-output guide and the 3-tier validator.
 - [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md), every failure mode I've hit.
 - [`docs/TUNING.md`](docs/TUNING.md), the lever set, anti-levers, how to sweep your own configs.

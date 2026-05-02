@@ -1,0 +1,113 @@
+# How this compares to other ways to run Qwen3.6-27B on Windows
+
+Honest framing of where this project sits versus the alternatives. If
+another tool fits your workflow better, use that, no offence taken.
+
+## Quick table
+
+| Option | Backend | Decode tok/s on 3090 (27B INT4) | MTP spec-decode | Tool calling | Multi-request | UI |
+|---|---|---|---|---|---|---|
+| **This project** | patched vLLM 0.19.0+devnen.1, native Windows | **64.5 to 72** (start_speed / start_72tps) | yes, MTP n=3 to n=6 | yes, OpenAI + Anthropic, baked in | yes | TUI |
+| Ollama | llama.cpp | 30 to 40 (Q4) | no, GGUF strips the head | beta | one at a time | CLI + GUI clients |
+| LM Studio | llama.cpp | 30 to 40 (Q4) | no | beta | one at a time | full GUI |
+| llama.cpp direct | llama.cpp | 30 to 40 (Q4) | no native MTP, only draft-model | partial | one at a time | CLI |
+| vLLM in Docker on Windows | upstream vLLM via Docker Desktop | 35 to 60 (depends on quant) | yes | yes | yes | terminal |
+| WSL2 + native vLLM | upstream vLLM | 50 to 80, less than native Linux | yes | yes | yes | terminal |
+| WSL2 + Blackwell guide (5090 only) | tuned vLLM cu128, see [vllm-blackwell-guide](https://github.com/lastloop-ai/vllm-blackwell-guide) | 120 (27B) / 200 (35B MoE) on 5090 | yes | yes | yes | terminal |
+| Native Linux | upstream vLLM | 80 to 160 depending on stack | yes | yes | yes | terminal |
+
+The 30 to 40 tok/s figure for llama.cpp on a 3090 is consistent across
+multiple r/LocalLLaMA reports for 27B Q4 quants at short to medium
+context. Decode falls off sharply with context (one user reported 50
+to 60 tok/s at 4 k context dropping to 5 tok/s at 8 k due to KV cache
+pressure), so the headline number is best-case.
+
+## Why this is faster than Ollama / LM Studio / llama.cpp
+
+Three reasons, all stack-level not config-level:
+
+1. **MTP spec-decode.** Qwen3.6 ships a multi-token-prediction head
+   that lets the model speculate several tokens per forward pass and
+   verify them in one shot. vLLM uses it. llama.cpp's GGUF conversion
+   strips it. So llama.cpp tops out at the un-speculated decode rate
+   while vLLM gets a real multiplier on top.
+2. **AutoRound INT4 with Marlin kernels.** AutoRound preserves more
+   accuracy than naive INT4 at the same bit width, and the Marlin
+   kernels are dramatically faster than llama.cpp's INT4 path on
+   Ampere and Ada.
+3. **Continuous batching.** vLLM serves multiple requests concurrently
+   from one model. llama.cpp serializes. For single-user chat the
+   difference is invisible, but for an agent that fires multiple tool
+   calls in flight it matters.
+
+## When llama.cpp is the right answer instead
+
+- **You have a 16 GB card or smaller.** Qwen3.6-27B INT4 weights are
+  16.96 GiB on disk, so vLLM cannot fit them on a 16 GB card after
+  activations and KV. llama.cpp can spill some layers to RAM. Use
+  llama.cpp + Q4 there. See [`HARDWARE.md`](HARDWARE.md).
+- **You have a Pascal or Turing card.** Marlin INT4 needs sm_80+,
+  Pascal has no BF16 in hardware, vLLM is a hard no on those. llama.cpp
+  works, just slower.
+- **You have RTX 50-series.** This project's wheel cannot run on
+  Blackwell yet (CUDA 12.6 / cu126 torch, no sm_120 kernels). Either
+  use llama.cpp / Ollama in the meantime, or follow
+  [jaMMint's WSL2 vllm-blackwell-guide](https://github.com/lastloop-ai/vllm-blackwell-guide).
+- **You want a polished GUI.** LM Studio is good. This project ships
+  a terminal TUI; you pick a snapshot and that is it.
+- **You have an AMD card.** ROCm vLLM does not ship in this Windows
+  wheel. Use llama.cpp with Vulkan or ROCm.
+
+## When WSL2 / Docker on Windows is worth it
+
+If you are already on Linux with Docker, Docker overhead is essentially
+zero (it is just kernel namespaces, not a VM). Stick with what you have.
+
+On Windows it is different. Docker Desktop runs through WSL2, which is
+a real VM on Hyper-V. CUDA goes through GPU-PV paravirtualisation, the
+Windows host driver still owns the GPU and DWM keeps its allocation.
+Same hardware, same model, one community member measured **85 tok/s in
+WSL vs 160 tok/s in native Ubuntu**
+([reported here](https://www.reddit.com/r/LocalLLaMA/comments/1sw21op/comment/oid8d9n/)).
+WSL 2.7.3 closes some of that gap (115 vs 160), not all.
+
+Pick WSL2 / Docker when:
+
+- You have an RTX 50-series card and need Blackwell support today
+  (this project does not have it yet).
+- You need an upstream vLLM feature that is not in the
+  `0.19.0+devnen.1` wheel, like NVFP4, ROCm, or specific Linux-only
+  patches.
+- You are already comfortable in Linux and are happy paying the WSL
+  tax.
+
+Otherwise, native Windows wins on tok/s.
+
+## When dual-boot Linux is worth it
+
+If you are running 24/7 inference on dedicated hardware, the
+single-digit-percent speedup is real and the ~70 tok/s gap (160 vs 90
+on a 5090, or roughly 90 vs 65 on a 3090) compounds over thousands of
+prompts. Honestly the sweet spot is a separate Ubuntu box with two
+3090s running 27B locally; that is the most cost-efficient setup I
+have found.
+
+This project exists for the people who already have Windows + a
+working NVIDIA GPU and do not want to dual-boot just to run a model.
+
+## When this project is the right answer
+
+- You are on Windows 10 or 11 with a 3090 / 4090 / A6000 (Ampere or
+  Ada). Blackwell support is pending; see [`HARDWARE.md`](HARDWARE.md).
+- You want OpenAI-compatible AND Anthropic-compatible endpoints out of
+  the box for Claude Code, Cline, Cursor, Codex CLI, OpenCode,
+  KiloCode, etc.
+- You want tool calling that just works, including the streaming-path
+  fixes that catch dropped parameters and split tags under spec-decode.
+- You do not want to install Python, conda, pip, MSVC (mostly), or any
+  global runtime. The portable zip drops in and runs.
+- You like reading exactly what flags every snapshot uses and being
+  able to verify a config end-to-end with `check_coherence.py` before
+  trusting any tok/s number.
+
+If two or more of those line up, this is probably the right tool.

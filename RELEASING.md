@@ -15,7 +15,7 @@ No PAT, no `WHEEL_RELEASE_TOKEN` secret needed.
 
 ## Release flow
 
-### Option A — tag and push (recommended)
+### Option A, tag and push (recommended)
 
 ```powershell
 git tag v0.1.1
@@ -32,7 +32,7 @@ The `release.yml` workflow:
 5. Creates a GitHub Release on the tag with the zip + sums attached
    and notes from `dist/RELEASE_NOTES.md`.
 
-### Option B — Actions UI
+### Option B, Actions UI
 
 Go to *Actions → Release portable launcher → Run workflow*. Required:
 `release_tag`. Optional: `wheel_url` if you want to pin a specific

@@ -6,12 +6,12 @@ its assigned port. No yaml editing, no command lines.
 
 ## Running it
 
-**Portable zip release (recommended)** — unzip the
+**Portable zip release (recommended)**, unzip the
 `vllm-windows-launcher-portable-x64.zip` from the GitHub Release, then
 double-click `start.bat` at the top of the folder. That's the entire
-install — Python, Textual, every dependency is already bundled.
+install, Python, Textual, every dependency is already bundled.
 
-**Developer checkout** — from the repo root with a venv that has the
+**Developer checkout**, from the repo root with a venv that has the
 launcher deps installed (`pip install textual rich httpx pyyaml`),
 double-click `launcher\start.bat` or run:
 

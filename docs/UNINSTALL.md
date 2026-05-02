@@ -4,7 +4,7 @@ The launcher is fully portable. There's no installer, no registry
 entries, no system services, no admin rights involved at any point.
 Uninstall is just deleting folders.
 
-## Step 1 — Stop the server
+## Step 1, Stop the server
 
 If a snapshot is running, stop it first:
 
@@ -19,7 +19,7 @@ If a snapshot is running, stop it first:
   This kills any orphan vLLM, EngineCore, or APIServer processes
   bound to the snapshot ports.
 
-## Step 2 — Delete the install folder
+## Step 2, Delete the install folder
 
 Wherever you extracted `qwen3.6-windows-server-portable-x64.zip`,
 delete that folder. It contains:
@@ -30,14 +30,14 @@ delete that folder. It contains:
 - The launcher TUI source
 - The portable Windows Terminal
 - The bundled chat templates
-- Logs (under `logs/`, unless your install dir was read-only — see
+- Logs (under `logs/`, unless your install dir was read-only, see
   step 3)
 
 That's the entire main install. After this step the project is gone
 from your machine *except* for the optional caches and the model
 weights, both of which live outside the install folder.
 
-## Step 3 — Optional cleanup outside the install folder
+## Step 3, Optional cleanup outside the install folder
 
 These directories are only touched if certain paths were used during
 the run. Delete whichever apply to you:

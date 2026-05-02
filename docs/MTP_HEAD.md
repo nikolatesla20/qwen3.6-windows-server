@@ -1,4 +1,4 @@
-# Why Lorbus AutoRound — the MTP head matters
+# Why Lorbus AutoRound, the MTP head matters
 
 Multi-token prediction (`--speculative-config '{"method":"mtp","num_speculative_tokens":N}'`)
 only works if the model weights ship an **MTP head in BF16**. The vLLM
@@ -11,10 +11,10 @@ specifically:
 
 - **Lorbus AutoRound** keeps `mtp.fc` in BF16 (~280 MiB extra), and the loader
   finds it.
-- Other Qwen3.6-27B quants — `cyankiwi`, `groxaxo/Qwen3.6-GPTQ-Pro-4bit`, etc.
-  — either OOM trying to allocate a fresh BF16 head on a 24 GB card, or
+- Other Qwen3.6-27B quants, `cyankiwi`, `groxaxo/Qwen3.6-GPTQ-Pro-4bit`, etc.
+ , either OOM trying to allocate a fresh BF16 head on a 24 GB card, or
   quantise the head to INT4 along with the body. The loader silently skips
-  the quantised head, MTP runs, and you get **0 % draft acceptance** — no
+  the quantised head, MTP runs, and you get **0 % draft acceptance**, no
   speedup, no error message.
 
 ## How to tell if MTP is actually working
@@ -29,7 +29,7 @@ Spec decode metrics: draft_acceptance_rate=0.62, system_efficiency=1.85
   0.2–0.5 for dense code. **If it's near 0.0, your quant's MTP head got
   silently skipped.**
 - `system_efficiency` should be > 1.2 to be worth running. < 1.0 means MTP
-  is *costing* you tokens — disable it.
+  is *costing* you tokens, disable it.
 
 Tail the log:
 
@@ -65,3 +65,16 @@ This is a vLLM 0.19.0 limitation, not a hardware one. It means: pick MTP
 and added a separate PP=2 snapshot for the rare 160 k-context case. See
 [`SPEC_DECODE_MATRIX.md`](SPEC_DECODE_MATRIX.md) for the full compatibility
 table.
+
+## Why not INT8 27B
+
+INT8 weights for Qwen3.6-27B are roughly 27 GiB, which does not fit on
+a single 24 GiB 3090. The only Windows path is PP=2 across both cards,
+which means no MTP (PP+MTP is broken on this wheel), so the decode rate
+caps near `start_pp2_160k`'s 43 tok/s minus whatever the larger weights
+cost in memory bandwidth.
+
+INT4 AutoRound is the sweet spot on 3090-class cards. KLD vs INT8 on
+Qwen3.6 is small, and the INT4 path keeps MTP, the speed, and headroom
+for big context. If you have a 5090 or A6000 with more VRAM and want
+to try INT8, please post numbers.

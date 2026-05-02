@@ -1,9 +1,9 @@
-# Coherence — TPS without it is a lie
+# Coherence, TPS without it is a lie
 
 A wrong KV-dtype, wrong quantization flag, or a corrupted shard will let
 vLLM cheerfully report 60+ tok/s while emitting `* * * *` or
 `the the the the`. The number is right; the output is garbage. **Always
-validate coherence before you trust a TPS number** — yours, ours, or
+validate coherence before you trust a TPS number**, yours, ours, or
 anyone's.
 
 ## The 3-tier validator
@@ -17,18 +17,18 @@ python windows_tools\check_coherence.py --port 5001
 
 Three prompts get sent at three different generation lengths:
 
-1. **Capital of France** (200 tok) — sanity. Expect one short sentence
+1. **Capital of France** (200 tok), sanity. Expect one short sentence
    ending with `Paris.` and `finish_reason=stop`.
-2. **300-word Whiskers cat / rooftop garden story** (700 tok) — long-form
+2. **300-word Whiskers cat / rooftop garden story** (700 tok), long-form
    narrative. Tests whether KV cache stays coherent past a few hundred
    tokens.
-3. **Iterative Fibonacci with docstring** (500 tok) — code generation.
+3. **Iterative Fibonacci with docstring** (500 tok), code generation.
    Different distribution than prose; catches issues that prose hides.
 
 Exit code:
-- `0` — all three coherent. Good.
-- `1` — at least one degenerate. Don't ship this config.
-- `2` — server unreachable. Check `--port`.
+- `0`, all three coherent. Good.
+- `1`, at least one degenerate. Don't ship this config.
+- `2`, server unreachable. Check `--port`.
 
 The script prints the first 200 chars of each response so you can eyeball
 the output yourself.
@@ -60,7 +60,7 @@ in production, you have a coherence problem regardless of what TPS says:
    shard = consistent local SHA, garbage output.
 4. **`max_tokens` runs out before `</think>`** when using
    `--reasoning-parser qwen3`. The whole response ends up in the
-   `reasoning` field with `content=""` — looks degenerate but is just
+   `reasoning` field with `content=""`, looks degenerate but is just
    truncated reasoning. Raise `max_tokens` or append `/no_think` to the
    prompt or drop the parser flag.
 5. **MTP head missing from quant.** Qwen3.6-27B AutoRound from Lorbus
@@ -79,7 +79,7 @@ TP=1, PP=1, MTP=off, --kv-cache-dtype=auto (BF16),
 ```
 
 This is slow but it should always be coherent on the Lorbus AutoRound
-quant. If even that produces gibberish, the model file is corrupt — not
+quant. If even that produces gibberish, the model file is corrupt, not
 a vLLM problem.
 
 ## Spec-decode metrics in the log
@@ -90,9 +90,9 @@ When MTP is enabled, vLLM logs per-window stats:
 Spec decode metrics: draft_acceptance_rate=0.62, system_efficiency=1.85
 ```
 
-- `draft_acceptance_rate` — what fraction of the speculated tokens were
+- `draft_acceptance_rate`, what fraction of the speculated tokens were
   accepted. Should be 0.4–0.7 for prose, 0.2–0.5 for dense code.
-- `system_efficiency` — net throughput multiplier vs no spec-decode.
+- `system_efficiency`, net throughput multiplier vs no spec-decode.
   Should be > 1.2 to be worth running.
 
 If `system_efficiency < 1.0`, MTP is *costing* you tokens. Either drop

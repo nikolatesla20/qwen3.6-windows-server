@@ -1,4 +1,4 @@
-# Tuning — the levers that actually move the numbers
+# Tuning, the levers that actually move the numbers
 
 The lever set on this wheel is narrower than upstream-Linux because TurboQuant
 KV, FlashInfer, and a few Genesis patches are unavailable. What remains:
@@ -13,7 +13,7 @@ KV, FlashInfer, and a few Genesis patches are unavailable. What remains:
    n=3 / 4 / 5 / 6 / 7 / 8  →  53.4 / 58.3 / 62.8 / 64.5 / 61.5 / 58.0 tok/s
    ```
    **n=6 is the long-prompt peak**, dropping a cliff at n=7. Always re-sweep
-   on a representative prompt for a new workload — don't trust a single
+   on a representative prompt for a new workload, don't trust a single
    fixed number.
 
 2. **Power cap.** 250 W → 350 W: prefill +16 %, decode unchanged (decode
@@ -24,13 +24,13 @@ KV, FlashInfer, and a few Genesis patches are unavailable. What remains:
 3. **Bigger ctx slows decode at fixed MTP.** Measured at MTP n=6:
    ctx=90 k → 64.5, ctx=112 k → 60.4 (–6 %). Likely KV-pool memory
    bandwidth during attention. If a snapshot doesn't need the full ctx
-   headroom, don't pay for it — split into a "speed" snapshot (smaller
+   headroom, don't pay for it, split into a "speed" snapshot (smaller
    ctx) and a "max-ctx" snapshot. We have both.
 
 4. **Cudagraphs on.** `--enforce-eager` costs ~55 % on Linux; untested on
    Windows but almost certainly similar. Don't disable.
 
-5. **Attention backend.** `TRITON_ATTN` only — FlashInfer JIT is broken
+5. **Attention backend.** `TRITON_ATTN` only, FlashInfer JIT is broken
    on Windows because ninja trips MAX_PATH inside flashinfer cache dirs.
    Pass `--attention-backend=TRITON_ATTN` as a CLI flag (the env var alone
    is ignored on 0.19.0).
@@ -80,7 +80,7 @@ KV, FlashInfer, and a few Genesis patches are unavailable. What remains:
 
 5. `--kv-cache-dtype=fp8_e4m3` always. fp8_e5m2 is rejected by TRITON_ATTN.
 
-6. `--max-num-seqs=1` always — single-user only.
+6. `--max-num-seqs=1` always, single-user only.
 
 ## Reading the KV pool from logs
 
@@ -93,10 +93,10 @@ INFO ... [kv_cache_utils.py:1324] Maximum concurrency for X tokens per request: 
 
 The "concurrency" factor is the real pool size: `physical_pool ≈ X × Y`.
 The "GPU KV cache size: N tokens" line is *not* the pool size on this
-wheel — it's a derived ceiling. Trust the `Maximum concurrency` line.
+wheel, it's a derived ceiling. Trust the `Maximum concurrency` line.
 
 When ctx is too high you instead get the `estimated maximum model length`
-error described above — read it, set max-model-len just under, re-launch.
+error described above, read it, set max-model-len just under, re-launch.
 
 ## Sweeping your own configs
 
@@ -112,7 +112,7 @@ label  kv_pool_GiB  ctx  mtp_n  prefill_tok_s  decode_tok_s  ttft_s  wall_tok_s 
 Convention: cold rows labeled `<config>`, warm rerun rows `<config>_run2`,
 `<config>_run3`. Cold runs hit fresh prefix cache (TTFT ~25 s on the
 ~25 k-token prompt); warm runs report TTFT ~4 s / prefill ~5 900 tok/s
-— that warm
+. That warm
 prefill is *bogus* for cross-config comparison. Decode TPS *is* meaningful
 on warm runs and useful for run-to-run noise.
 

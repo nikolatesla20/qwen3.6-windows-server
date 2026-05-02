@@ -30,12 +30,12 @@ How to verify CLI flags:
 | `--kv-cache-dtype=NVFP4` / `MXFP4` | Late-2025 vLLM features | Not in 0.19.0. |
 | `--kv-cache-dtype=turboquant_3bit_nc` | Genesis patches blog posts | Not in 0.19.0; needs the Genesis tree which hasn't been Windows-ported. |
 | `--kv-cache-dtype=fp8_e5m2` | Older Linux recipes | Rejected by TRITON_ATTN with `only accepts {"fp8","fp8_e4m3"}`. Use `fp8_e4m3`. |
-| `VLLM_ATTENTION_BACKEND` env var | "set this and you're done" | The env var is *ignored* on 0.19.0. Pass `--attention-backend=TRITON_ATTN` as a CLI arg instead. (Set the env var too if you like — only the CLI matters.) |
+| `VLLM_ATTENTION_BACKEND` env var | "set this and you're done" | The env var is *ignored* on 0.19.0. Pass `--attention-backend=TRITON_ATTN` as a CLI arg instead. (Set the env var too if you like, only the CLI matters.) |
 | `--enable-turboquant` | Turbo project flags | Not in this wheel. |
 | `--cpu-offload-gb` | "for big models" | Exists but extends *batch capacity*, not *per-sequence ctx*. With `max-num-seqs=1` it does nothing useful. |
-| `--swap-space` | Same | Same — batch capacity, not ctx. |
+| `--swap-space` | Same | Same, batch capacity, not ctx. |
 
-## Anti-levers — exist but measured to be no-ops or worse on this wheel
+## Anti-levers, exist but measured to be no-ops or worse on this wheel
 
 | Lever | Web claim | Measured on this wheel |
 |---|---|---|

@@ -1,4 +1,4 @@
-# Windows VRAM and headless GPU — what's actually possible
+# Windows VRAM and headless GPU, what's actually possible
 
 > Why this exists: on Windows the GPU that drives your display loses 1-3 GiB
 > of VRAM to the desktop compositor (DWM) and another 2-5 GiB to running apps
@@ -31,7 +31,7 @@
 - **If you have 2 GPUs, this project's default is right:** display on GPU0,
   vLLM on GPU1. Don't overthink it.
 
-## The desktop VRAM tax — measured
+## The desktop VRAM tax, measured
 
 Numbers below are typical ranges from multiple sources (r/Windows11,
 r/nvidia, techtactician, Microsoft Q&A). Exact figures vary with monitor
@@ -80,7 +80,7 @@ Rule of thumb for a 24 GiB display GPU running a typical office workload:
 - The Windows Desktop Window Manager (`dwm.exe`) is mandatory on Windows 8
   and later. You can kill it; it respawns within ~1 second under Session
   Manager. Even if you stop the service, the GPU driver's WDDM allocation
-  stays — the driver itself reserves a chunk of VRAM for paging buffers,
+  stays, the driver itself reserves a chunk of VRAM for paging buffers,
   the framebuffer, and PCIe BAR mappings whenever a display is attached.
 - Pulling the monitor cable does not help. The driver still treats the GPU
   as a display device and keeps the framebuffer mapped, because Windows
@@ -101,14 +101,14 @@ So on consumer Windows with a GeForce card, you will always pay a 0.8-1.5 GiB
 WDDM driver tax even with zero apps open. Everything above that is
 **discretionary** and can be clawed back.
 
-## Practical workarounds — ranked by effort vs VRAM freed
+## Practical workarounds, ranked by effort vs VRAM freed
 
-### 1. Move display to iGPU (Intel desktop CPUs only) — ~2-4 GiB freed, free
+### 1. Move display to iGPU (Intel desktop CPUs only), ~2-4 GiB freed, free
 
 If your Intel desktop CPU has an integrated GPU (most non-`F` SKUs from
 12th gen onward), you can route the display to it. AMD desktop CPUs
 without the `G` suffix (5800X, 7700X, 9800X3D, etc.) **do not have an
-iGPU** — skip to workaround #2.
+iGPU**, skip to workaround #2.
 
 Procedure:
 
@@ -119,7 +119,7 @@ Procedure:
 2. Set **Primary Display** / **Initiate Graphic Adapter** to **IGFX** (also
    labelled "CPU Graphics" or "Internal Graphics").
 3. Set **iGPU Multi-Monitor** (a.k.a. **IGFX Multi-Monitor**) to **Enabled**.
-   This is the key toggle — without it, most boards auto-disable the iGPU
+   This is the key toggle, without it, most boards auto-disable the iGPU
    the moment a dGPU is detected.
 4. Bump **DVMT Pre-Allocated** from Auto (~64 MB) to **512 MB or higher**
    for smoother desktop, especially at 4K. The iGPU draws its framebuffer
@@ -129,7 +129,7 @@ Procedure:
 6. Boot Windows. Install the latest Intel Graphics Driver (32.x supports
    11th-14th gen). Keep the NVIDIA driver as-is.
 7. `nvidia-smi` should now show GPU0 at ~0.3-0.5 GiB at idle instead of
-   1.0-1.5 GiB. DWM follows the cable — no Windows toggle is needed.
+   1.0-1.5 GiB. DWM follows the cable, no Windows toggle is needed.
    You can also assign `dwm.exe` to "Power Saving" in Settings →
    Display → Graphics as a belt-and-suspenders measure (results are
    inconsistent; the cable does the real work).
@@ -148,13 +148,13 @@ Caveats:
   but most motherboards only expose 2 ports (1× HDMI + 1× DP). For 3+
   monitors, see workaround #2.
 - **NVENC / hardware encoding** for OBS, streaming, and video editors
-  still runs on the 3090 — that does not move with the cable.
+  still runs on the 3090, that does not move with the cable.
 - **Cross-adapter composition**: if any app explicitly renders on the
   3090 and composites on the iGPU, Windows still allocates a small share
   buffer on the 3090. Real-world savings are typically 2-4 GiB, not a
   clean zeroing.
 
-### 2. Cheap secondary GPU for display — ~2-4 GiB freed, $50-150
+### 2. Cheap secondary GPU for display, ~2-4 GiB freed, $50-150
 
 If you have no iGPU (most AM4/AM5 systems, Threadripper, older Intel HEDT),
 add a low-end card purely for display. Good options as of late 2025:
@@ -187,7 +187,7 @@ Driver notes:
   package can be installed system-wide and it must support both
   architectures. Current 560+ drivers cover Pascal through Ada in one
   package, so GT 1030 + 3090 is fine today. The day NVIDIA drops Pascal,
-  GT 1030 will throw a Code 31 in Device Manager — at that point swap
+  GT 1030 will throw a Code 31 in Device Manager, at that point swap
   to a Turing+ low-end card (GTX 1650).
 - **NVIDIA + AMD** (e.g., RX 6400 + RTX 3090) is architecturally cleaner:
   separate driver packages, no version-lock risk, and the AMD card
@@ -199,7 +199,7 @@ Driver notes:
   App) reduces the chance of the well-known "one of two NVIDIA cards
   randomly disabled" bug some users hit on Win11.
 
-### 3. Disable hardware acceleration in apps — ~1-3 GiB freed, free, 5 minutes
+### 3. Disable hardware acceleration in apps, ~1-3 GiB freed, free, 5 minutes
 
 This is the highest leverage knob if you skip everything else. Per-app
 toggles:
@@ -222,7 +222,16 @@ toggles:
 Cumulative on a typical office desktop: 1.5-2.5 GiB. Tradeoff is slightly
 laggier scrolling and CPU-decoded video. For an LLM workstation, easy win.
 
-### 4. Close everything before launching vLLM — ~2-4 GiB freed, free
+> **Win 11 per-app GPU routing.** Settings → Display → Graphics lets you
+> assign individual apps to "Power saving" (iGPU or low-end GPU) instead
+> of "High performance" (the dGPU). On systems where lots of background
+> apps quietly hold a chunk of dGPU memory (a community-reported example:
+> apps spuriously using an eGPU for compositor boost), forcing them to
+> the iGPU drops contention noticeably. No tok/s gain by itself, but
+> it stabilises mouse and keyboard responsiveness when the dGPU is
+> under sustained vLLM load.
+
+### 4. Close everything before launching vLLM, ~2-4 GiB freed, free
 
 Crude but works. A `start_vllm.bat` that does this before launching the
 server:
@@ -241,7 +250,7 @@ nvidia-smi --query-gpu=memory.free --format=csv
 
 Combined with #3, this comfortably reclaims 4-6 GiB on a busy desktop.
 
-### 5. RDP / `tscon` console disconnect — ~0-0.5 GiB, situational
+### 5. RDP / `tscon` console disconnect, ~0-0.5 GiB, situational
 
 Disconnecting the local console session via `tscon` (move the session to
 a "listener") is a known trick on Windows Server. On Windows 10/11
@@ -250,7 +259,7 @@ the framebuffer stays mapped. Real-world VRAM savings are small (under
 500 MiB) and apps that respond to session-change events (Teams, OneDrive)
 may misbehave. Not worth the friction unless you already RDP in daily.
 
-### 6. Hardware-accelerated GPU scheduling (HAGS) — neutral
+### 6. Hardware-accelerated GPU scheduling (HAGS), neutral
 
 Settings → System → Display → Graphics → Default settings → "Hardware-
 accelerated GPU scheduling" toggle. Reports are mixed:
@@ -263,7 +272,7 @@ accelerated GPU scheduling" toggle. Reports are mixed:
 For vLLM specifically, leave it at the default (On for Win11) unless you
 hit TDR resets, in which case try Off.
 
-### 7. Increase TDR delay — doesn't free VRAM but prevents crashes
+### 7. Increase TDR delay, doesn't free VRAM but prevents crashes
 
 Long prefill on a busy GPU can hit Windows' default 2-second timeout. Add
 under `HKLM\SYSTEM\CurrentControlSet\Control\GraphicsDrivers`:
@@ -276,7 +285,7 @@ TdrDdiDelay  (DWORD) = 60
 Reboot. Not a VRAM workaround per se, but the symptom of "vLLM dies during
 long prefills on the display GPU" is sometimes a TDR, not OOM.
 
-### 8. Lower vLLM `--gpu-memory-utilization` and `--max-model-len` — always works
+### 8. Lower vLLM `--gpu-memory-utilization` and `--max-model-len`, always works
 
 The reliable fallback. On a display-attached 24 GiB 3090 running Qwen3-27B
 INT4, sane starting points:
@@ -291,7 +300,7 @@ This trades context length for fitting at all. See this repo's
 
 ## What does NOT work / is no longer possible
 
-### TCC mode on consumer GeForce — dead, and has been for years
+### TCC mode on consumer GeForce, dead, and has been for years
 
 NVIDIA has restricted TCC (Tesla Compute Cluster) mode to professional and
 data-center SKUs since the Turing generation. On RTX 30/40/50 series the
@@ -304,13 +313,13 @@ If you need a card you can flip to TCC, your options are RTX A4000 / A5000
 / A6000, the L4/L40, or older Quadros (RTX 4000/5000/6000 of the Turing
 generation). All cost meaningfully more than a used 3090.
 
-### Disabling DWM permanently — not supported
+### Disabling DWM permanently, not supported
 
 You can `Stop-Service uxsms` but Session Manager respawns DWM. Registry
 hacks that worked on Windows 7 (`DisableDWM`) have no effect on 10/11.
 There is no supported "no-compositor" mode.
 
-### WSL2 to free Windows VRAM — does not work
+### WSL2 to free Windows VRAM, does not work
 
 WSL2's CUDA support is GPU-PV (paravirtualized), which means the Windows
 host driver still owns the GPU, and DWM is still running on the host. VRAM
@@ -325,7 +334,7 @@ WSL2 is the right answer for "I need Linux-only Python tooling," not for
 "I need more VRAM." Run vLLM natively on Windows (this project) or
 dual-boot Linux for real headless.
 
-### Hyper-V DDA / GPU partitioning on Win11 Pro — not for this use case
+### Hyper-V DDA / GPU partitioning on Win11 Pro, not for this use case
 
 Hyper-V Discrete Device Assignment requires Windows Server, not Win11 Pro.
 GPU Partitioning (GPU-P) on Win11 Pro is gated to specific OEM scenarios
@@ -333,14 +342,14 @@ GPU Partitioning (GPU-P) on Win11 Pro is gated to specific OEM scenarios
 Proxmox / KVM passthrough on Linux is the working alternative, but at that
 point you are running Linux and the question is moot.
 
-### Killing `dwm.exe` to free VRAM — temporary at best
+### Killing `dwm.exe` to free VRAM, temporary at best
 
 `taskkill /F /IM dwm.exe` works for ~1 second before the Session Manager
 restarts it. There is no supported way to keep it dead while a user
 session is active. Even if you could, individual apps (Edge, Teams) hold
 their own GPU contexts that are unaffected by DWM.
 
-### Removing display drivers with DDU and not reinstalling — breaks CUDA
+### Removing display drivers with DDU and not reinstalling, breaks CUDA
 
 The CUDA runtime on Windows depends on the same display driver. There is
 no separate "compute-only" driver package for GeForce. If you uninstall
@@ -368,7 +377,7 @@ the display driver, CUDA stops working too.
 
 2× dGPUs (this project's reference setup)
   └─ Display on GPU0, vLLM on GPU1 with `CUDA_VISIBLE_DEVICES=1`.
-            Or PP=2 / TP=2 across both — see the project's PP/TP memory.
+            Or PP=2 / TP=2 across both, see the project's PP/TP memory.
 
 iGPU + 1× dGPU
   └─ Pin display to iGPU. dGPU runs vLLM full-fat. Identical to #1.
