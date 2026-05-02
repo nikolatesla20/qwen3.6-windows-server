@@ -9,11 +9,11 @@ setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 set PYTHONUNBUFFERED=1
 set PYTHONIOENCODING=utf-8
-REM Both GPUs exposed; start_pp2_ngram.py sets this again to be explicit.
+REM Both GPUs exposed; start_pp2.py sets this again to be explicit.
 set CUDA_VISIBLE_DEVICES=0,1
 
 set "PY=%VLLM_WINDOWS_VENV%\Scripts\python.exe"
 if "%VLLM_WINDOWS_VENV%"=="" set "PY=%~dp0..\venv\Scripts\python.exe"
 if not exist "%PY%" set "PY=%~dp0..\python\python.exe"
-"%PY%" -u "%~dp0start_pp2_ngram.py"
+"%PY%" -u "%~dp0start_pp2.py"
 endlocal

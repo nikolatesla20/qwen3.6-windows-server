@@ -134,16 +134,27 @@ def msvc_env() -> dict:
     """Capture env vars set by vcvars64.bat so FlashInfer's ninja+cl.exe JIT works.
 
     Without this, fp8 KV hits a FileNotFoundError when FlashInfer tries to
-    compile a new prefill kernel at first request.
+    compile a new prefill kernel at first request. Best-effort: shipped
+    snapshots use TRITON_ATTN, not FlashInfer JIT, so failure here is a
+    warning, not a fatal error.
     """
     if not Path(VCVARS).exists():
         print(f"[warn] vcvars64.bat not found at {VCVARS} - FlashInfer JIT may fail.")
         return {}
     path_prefix = f'set "PATH={VS_INSTALLER_DIR};%PATH%" && ' if Path(VS_INSTALLER_DIR).is_dir() else ""
-    out = subprocess.check_output(
-        f'cmd /S /C "{path_prefix}"{VCVARS}" && set"',
-        text=True, errors="replace",
-    )
+    try:
+        out = subprocess.check_output(
+            f'cmd /S /C "{path_prefix}"{VCVARS}" && set"',
+            text=True, errors="replace", stderr=subprocess.STDOUT,
+        )
+    except (subprocess.CalledProcessError, OSError) as e:
+        print(
+            f"[warn] vcvars64.bat invocation failed ({e.__class__.__name__}); "
+            f"continuing without MSVC env. TRITON_ATTN snapshots are unaffected; "
+            f"FlashInfer JIT (if used) may fail at first request.",
+            file=sys.stderr,
+        )
+        return {}
     env = {}
     for line in out.splitlines():
         if "=" in line:

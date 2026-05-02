@@ -21,6 +21,14 @@ Portable Windows launcher for Qwen3.6-27B inference. Unzip, double-click `start.
 3. Extract anywhere, no admin needed, **including `Program Files` / `Program Files (x86)`**.
 4. Double-click `start.bat`. On first run the launcher auto-discovers existing weights or offers to download Lorbus/Qwen3.6-27B-int4-AutoRound from Hugging Face (~16 GB, public, no token).
 
+## What's new in v0.1.14
+
+Three bugs reported by Shustrik116 in the launch thread:
+
+- **`msvc_env()` no longer crashes the snapshot on a vcvars64.bat parse failure.** Wrapped the `subprocess.check_output` call in try/except and downgraded failure to a warning. Shipped snapshots use TRITON_ATTN, not FlashInfer JIT, so an MSVC env failure should never stop boot. The previous build crashed all 4 single-GPU snapshots on machines where vcvars64.bat's call to vcvarsall.bat tripped a cmd quoting glitch.
+- **`start_pp2_160k.bat` now calls `start_pp2.py` instead of the non-existent `start_pp2_ngram.py`.** Old name was a leftover from an earlier ngram-spec-decode experiment. The PP=2 + ngram path was removed; only PP=2 with no spec-decode ships.
+- **Removed the `dflash` config from `configs.yaml`.** It was a personal dev-tree config pointing at `C:\_projects\luce-dflash\`, which obviously does not exist on user machines. Should never have shipped.
+
 ## What's new in v0.1.9
 
 Docs-only cleanup ahead of the public launch:
