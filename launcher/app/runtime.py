@@ -1,7 +1,11 @@
 from __future__ import annotations
+import os
 import re
+import socket
 import subprocess
+import time
 from dataclasses import dataclass
+from pathlib import Path
 
 CREATE_NEW_CONSOLE = 0x00000010
 CREATE_NO_WINDOW = 0x08000000
@@ -160,45 +164,186 @@ def _ancestor_chain(pid: int, max_depth: int = 8) -> list[tuple[int, str]]:
     return chain
 
 
-def kill_pid(pid: int) -> tuple[bool, str]:
-    """Kill the vLLM process tree AND its parent cmd.exe so the terminal tab closes.
+def _all_descendants(root_pid: int) -> list[int]:
+    """Return every descendant pid of root_pid (transitive), not including root."""
+    try:
+        r = subprocess.run(
+            ["powershell", "-NoProfile", "-Command",
+             "Get-CimInstance Win32_Process | "
+             "ForEach-Object { \"$($_.ProcessId)|$($_.ParentProcessId)\" }"],
+            capture_output=True, text=True, timeout=10,
+            creationflags=CREATE_NO_WINDOW,
+        )
+    except Exception:
+        return []
+    children: dict[int, list[int]] = {}
+    for line in (r.stdout or "").splitlines():
+        if "|" not in line:
+            continue
+        try:
+            pid_s, ppid_s = line.split("|", 1)
+            pid_i, ppid_i = int(pid_s), int(ppid_s)
+        except ValueError:
+            continue
+        children.setdefault(ppid_i, []).append(pid_i)
+    out: list[int] = []
+    stack = [root_pid]
+    seen: set[int] = {root_pid}
+    while stack:
+        cur = stack.pop()
+        for ch in children.get(cur, []):
+            if ch in seen:
+                continue
+            seen.add(ch)
+            out.append(ch)
+            stack.append(ch)
+    return out
 
-    Process tree on Windows when launched via wt -> cmd /k bat -> python:
-      WindowsTerminal.exe -> OpenConsole.exe -> cmd.exe -> python.exe -> python.exe (workers)
-    taskkill /T from python only kills descendants, leaving cmd.exe alive (because of /k),
-    so the WT tab stays. We additionally locate and kill the parent cmd.exe.
+
+def _kill_one(pid: int, tree: bool = True) -> tuple[bool, str]:
+    try:
+        args = ["taskkill", "/F", "/PID", str(pid)]
+        if tree:
+            args.insert(2, "/T")
+        r = subprocess.run(
+            args, capture_output=True, text=True, timeout=10,
+            creationflags=CREATE_NO_WINDOW,
+        )
+        return r.returncode == 0, (r.stdout + r.stderr).strip()
+    except Exception as e:
+        return False, str(e)
+
+
+def _port_free(port: int, host: str = "127.0.0.1", timeout: float = 0.3) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(timeout)
+        try:
+            s.connect((host, port))
+            return False
+        except OSError:
+            return True
+
+
+_RE_LOG_PIDS = re.compile(r"(?:EngineCore|APIServer)\s+pid=(\d+)")
+
+
+def _sweep_log_pids(log_dirs: list[Path]) -> set[int]:
+    """Parse vLLM log files for EngineCore / APIServer pid markers."""
+    pids: set[int] = set()
+    for d in log_dirs:
+        if not d.exists():
+            continue
+        for log in list(d.glob("vllm_server*.log")):
+            try:
+                text = log.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            for m in _RE_LOG_PIDS.findall(text):
+                try:
+                    pids.add(int(m))
+                except ValueError:
+                    pass
+    return pids
+
+
+def _repo_log_dirs() -> list[Path]:
+    """Best-effort log dirs to scan for EngineCore/APIServer pid markers.
+
+    Mirrors snapshots/stop_vllm.py: VLLM_WINDOWS_LOGS env, then <repo>/logs/,
+    then snapshot dir itself (legacy)."""
+    dirs: list[Path] = []
+    env_dir = os.environ.get("VLLM_WINDOWS_LOGS")
+    if env_dir:
+        dirs.append(Path(env_dir))
+    here = Path(__file__).resolve()
+    # launcher/app/runtime.py -> repo root is parents[2]
+    repo = here.parents[2] if len(here.parents) >= 3 else here.parent
+    dirs.append(repo / "logs")
+    dirs.append(repo / "snapshots")
+    return dirs
+
+
+def kill_pid(pid: int, port: int | None = None) -> tuple[bool, str]:
+    """Hard-stop a vLLM config: free CUDA/VRAM, close the WT tab, sweep orphans.
+
+    Process tree on Windows when launched via `wt -> cmd /k start_*.bat`:
+      WindowsTerminal -> OpenConsole -> cmd.exe (cmd /k)
+        -> python.exe (start_*.py wrapper that tees logs)
+           -> vllm.exe / python.exe (API server, what netstat returns)
+              -> python.exe workers (EngineCore, etc.)
+
+    Killing the netstat pid + /T only reaps the API server and workers; the
+    wrapper python and cmd.exe survive. vLLM also occasionally reparents
+    workers, leaving CUDA-holding orphans. Strategy:
+
+      1. Snapshot every descendant of the parent cmd.exe BEFORE killing.
+      2. Sweep `logs/vllm_server*.log` for EngineCore/APIServer pid markers.
+      3. Kill the netstat pid tree first (fast VRAM release).
+      4. Kill the parent cmd.exe tree (catches wrapper python + closes WT tab).
+      5. Kill any snapshot/log pids still alive (catches reparented orphans).
+      6. If a port was given, wait up to 10s for it to free.
     """
     msgs: list[str] = []
     ok_any = False
+
+    # 1) locate parent cmd.exe (don't cross into the terminal itself)
     cmd_pid: int | None = None
-    chain = _ancestor_chain(pid)
-    for ancestor_pid, name in chain[1:]:  # skip self
+    for ancestor_pid, name in _ancestor_chain(pid)[1:]:
         if name == "cmd.exe":
             cmd_pid = ancestor_pid
             break
         if name in ("windowsterminal.exe", "openconsole.exe", "conhost.exe"):
-            break  # don't kill the terminal itself
-    try:
-        r = subprocess.run(
-            ["taskkill", "/F", "/T", "/PID", str(pid)],
-            capture_output=True, text=True, timeout=10,
-            creationflags=CREATE_NO_WINDOW,
-        )
-        ok_any = ok_any or (r.returncode == 0)
-        msgs.append(f"py:{(r.stdout + r.stderr).strip()}")
-    except Exception as e:
-        msgs.append(f"py:{e}")
+            break
+
+    # 2) snapshot descendants of cmd (or pid if no cmd) BEFORE killing
+    snap_root = cmd_pid if cmd_pid is not None else pid
+    snapshot = set(_all_descendants(snap_root))
+    snapshot.add(pid)
     if cmd_pid is not None:
-        try:
-            r = subprocess.run(
-                ["taskkill", "/F", "/T", "/PID", str(cmd_pid)],
-                capture_output=True, text=True, timeout=10,
-                creationflags=CREATE_NO_WINDOW,
-            )
-            ok_any = ok_any or (r.returncode == 0)
-            msgs.append(f"cmd({cmd_pid}):{(r.stdout + r.stderr).strip()}")
-        except Exception as e:
-            msgs.append(f"cmd:{e}")
+        snapshot.add(cmd_pid)
+
+    # 3) sweep log files for EngineCore / APIServer pids
+    log_pids = _sweep_log_pids(_repo_log_dirs())
+    if log_pids:
+        msgs.append(f"log-pids:{sorted(log_pids)}")
+
+    # 4) kill netstat pid first (fast VRAM release for the API server tree)
+    ok, m = _kill_one(pid, tree=True)
+    ok_any = ok_any or ok
+    msgs.append(f"py({pid}):{m}")
+
+    # 5) kill the cmd parent tree (wrapper python + closes WT tab)
+    if cmd_pid is not None:
+        ok, m = _kill_one(cmd_pid, tree=True)
+        ok_any = ok_any or ok
+        msgs.append(f"cmd({cmd_pid}):{m}")
     else:
         msgs.append("cmd:not-found")
+
+    # 6) sweep: kill any snapshot pid and log-pid still alive
+    survivors = snapshot | log_pids
+    survivors.discard(pid)
+    if cmd_pid is not None:
+        survivors.discard(cmd_pid)
+    if survivors:
+        time.sleep(0.3)  # give the previous taskkills a moment
+        killed_extra: list[int] = []
+        for p in sorted(survivors):
+            ok, _ = _kill_one(p, tree=True)
+            if ok:
+                killed_extra.append(p)
+        if killed_extra:
+            msgs.append(f"sweep:{killed_extra}")
+
+    # 7) wait for the port to free (best effort)
+    if port is not None:
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            if _port_free(port):
+                msgs.append(f"port({port}):free")
+                break
+            time.sleep(0.4)
+        else:
+            msgs.append(f"port({port}):still-busy")
+
     return ok_any, " | ".join(msgs)

@@ -251,16 +251,31 @@ class DetailScreen(Screen):
         if not proc:
             self.app.notify("Not running", severity="warning"); return
         def _yes(ok: bool):
-            if ok:
-                from .. import runtime
-                success, msg = runtime.kill_pid(proc.pid)
-                self.app.notify(("Killed " if success else "Kill failed: ") + msg,
-                               severity="information" if success else "error", timeout=6)
-                self.app.refresh_running()
+            if not ok:
+                return
+            self.app.notify("Unloading vLLM (releasing VRAM, closing terminal)...", timeout=3)
+            self.app.run_worker(
+                lambda: self._unload_blocking(proc.pid, proc.port),
+                thread=True, exclusive=False,
+            )
         self.app.push_screen(
             ConfirmModal(f"Kill PID {proc.pid} on port {proc.port}?\nThis stops vLLM."),
             _yes,
         )
+
+    def _unload_blocking(self, pid: int, port: int) -> None:
+        try:
+            from .. import runtime
+            success, msg = runtime.kill_pid(pid, port=port)
+        except Exception as e:
+            success, msg = False, f"unload exception: {e}"
+        self.app.call_from_thread(
+            self.app.notify,
+            ("Killed " if success else "Kill failed: ") + msg,
+            severity="information" if success else "error",
+            timeout=6,
+        )
+        self.app.call_from_thread(self.app.refresh_running)
 
     def _do_test(self) -> None:
         cfg = self.cfg
