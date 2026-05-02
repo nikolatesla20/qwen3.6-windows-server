@@ -272,11 +272,26 @@ build, and the relevant slice of `logs\vllm_server.<port>.log`. The
 [issue template](.github/ISSUE_TEMPLATE/bug_report.md) walks you
 through it.
 
+**Share your configs.** Each snapshot in `snapshots/` is just a
+validated set of vLLM flags for one hardware/model combo, plus a card
+in `launcher/configs.yaml` so the launcher can list it. If you've got
+a config that runs coherent and faster (or with more context) than
+what's in here, please send a PR. The bar is the
+[3-tier coherence check](docs/COHERENCE.md), TPS without coherence
+won't be merged.
+
+Configs I'd love to see:
+
+- Other Qwen3.6-27B quants (FP8, NVFP4, smaller AutoRound variants)
+- Smaller Qwen models (14B, 8B, 4B) for 16 GB cards
+- 4090 / 5090 / 5060 Ti / A6000 tunings
+- New parallelism or KV-cache combos as vLLM adds them
+
+How to add a snapshot: [`snapshots/README.md`](snapshots/README.md).
+
 This project is intentionally narrow scope: **Windows + Ampere/Ada/Blackwell
-NVIDIA + Qwen3.6-27B**. PRs that extend it to other Qwen-class models on the
-same hardware (Qwen3-Next, Qwen3.5) are welcome. PRs that extend it to
-other operating systems or other GPU vendors are politely out of scope,
-please go upstream.
+NVIDIA**. PRs for other operating systems or GPU vendors are politely
+out of scope, please go upstream.
 
 ## Credits
 
