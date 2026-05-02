@@ -162,6 +162,59 @@ def msvc_env() -> dict:
             env[k] = v
     return env
 
+def cuda_env() -> dict:
+    """Set CUDA_LIB_PATH so flashinfer's import-time check passes.
+
+    vLLM 0.19.0 unconditionally imports flashinfer from
+    ``vllm/v1/sample/ops/topk_topp_sampler.py`` regardless of which
+    attention backend is selected. flashinfer's Windows path raises
+    ``ValueError: CUDA_LIB_PATH is not set`` at import time if the
+    env var is missing, taking the whole engine down before TRITON_ATTN
+    even gets a chance to load.
+
+    Probe order:
+      1. Existing ``CUDA_LIB_PATH`` (already set by user, leave alone).
+      2. ``CUDA_PATH`` env var (set by NVIDIA's CUDA Toolkit installer).
+      3. ``CUDA_HOME`` env var (Linux convention, sometimes set).
+      4. Standard install dirs under
+         ``C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\``,
+         newest version first.
+      5. Fallback: the embedded Python dir. flashinfer's check only
+         validates the env var is non-empty; the actual lib path is
+         only used if JIT compilation fires. Shipped snapshots use
+         TRITON_ATTN, so JIT never runs and the fake path is harmless.
+
+    The fallback prints a warning naming the symptom. JIT-using paths
+    (FlashInfer attention, fp8 prefill kernel build) will fail loudly
+    later if the user ever needs them.
+    """
+    if os.environ.get("CUDA_LIB_PATH"):
+        return {}
+    for var in ("CUDA_PATH", "CUDA_HOME"):
+        val = os.environ.get(var)
+        if val and Path(val).is_dir():
+            return {"CUDA_LIB_PATH": val}
+    nvidia_root = Path(r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA")
+    if nvidia_root.is_dir():
+        versions = sorted(
+            (p for p in nvidia_root.iterdir() if p.is_dir() and p.name.startswith("v")),
+            key=lambda p: p.name,
+            reverse=True,
+        )
+        if versions:
+            return {"CUDA_LIB_PATH": str(versions[0])}
+    print(
+        "[warn] No CUDA Toolkit found (checked CUDA_PATH, CUDA_HOME, "
+        r"and C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\). "
+        "Setting CUDA_LIB_PATH to a placeholder so flashinfer's import "
+        "check passes. Shipped snapshots use TRITON_ATTN so this is "
+        "fine, but FlashInfer JIT paths (fp8 prefill kernel build) "
+        "will fail. Install CUDA Toolkit 12.x to fully clear this.",
+        file=sys.stderr,
+    )
+    return {"CUDA_LIB_PATH": str(REPO_ROOT / "python")}
+
+
 def _resolve_logs_dir() -> Path:
     """Return a writable logs dir.
 

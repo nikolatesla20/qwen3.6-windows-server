@@ -21,6 +21,14 @@ Portable Windows launcher for Qwen3.6-27B inference. Unzip, double-click `start.
 3. Extract anywhere, no admin needed, **including `Program Files` / `Program Files (x86)`**.
 4. Double-click `start.bat`. On first run the launcher auto-discovers existing weights or offers to download Lorbus/Qwen3.6-27B-int4-AutoRound from Hugging Face (~16 GB, public, no token).
 
+## What's new in v0.1.15
+
+One bug, exposed by v0.1.14 finally letting boot get this far:
+
+- **`ValueError: CUDA_LIB_PATH is not set` from flashinfer at EngineCore init.** vLLM 0.19 unconditionally imports flashinfer in `topk_topp_sampler.py`, regardless of which attention backend you select. flashinfer's Windows path raises at import time if `CUDA_LIB_PATH` is missing, even though the shipped snapshots use TRITON_ATTN and never trigger flashinfer JIT. New `cuda_env()` in `snapshots/_common.py` probes `CUDA_PATH`, `CUDA_HOME`, and standard NVIDIA Toolkit install dirs and sets `CUDA_LIB_PATH` before launching vLLM. If no Toolkit is installed, a placeholder path is set so the import check passes; TRITON_ATTN never needs the real libs.
+
+Reported by Shustrik116 in the launch thread.
+
 ## What's new in v0.1.14
 
 Three bugs reported by Shustrik116 in the launch thread:

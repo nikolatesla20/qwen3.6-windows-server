@@ -20,7 +20,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 # Reuse the existing Windows vLLM install so this folder stays rollbackable.
-from _common import VENV, VLLM_EXE, MODEL_PATH, VCVARS, msvc_env, log_path_for, enhanced_jinja_path, resolve_cuda_visible_devices
+from _common import VENV, VLLM_EXE, MODEL_PATH, VCVARS, msvc_env, cuda_env, log_path_for, enhanced_jinja_path, resolve_cuda_visible_devices
 SERVED_NAME = "qwen3.6-27b-autoround"
 HOST = "0.0.0.0"
 PORT = 5001  # different from vllm-windows (5000), so both can coexist if needed
@@ -73,6 +73,9 @@ def main() -> int:
     # Overlay MSVC dev env so FlashInfer can JIT-compile kernels (needed for
     # fp8 KV cache which triggers a new prefill kernel build at first request).
     env.update(msvc_env())
+    # vLLM 0.19 unconditionally imports flashinfer in the sampler;
+    # flashinfer's Windows path raises if CUDA_LIB_PATH is unset.
+    env.update(cuda_env())
     ENHANCED_JINJA = enhanced_jinja_path()
     if not Path(ENHANCED_JINJA).exists():
         print(f"[ERROR] enhanced jinja template not found: {ENHANCED_JINJA}", file=sys.stderr)
