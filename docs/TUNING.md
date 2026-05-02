@@ -35,12 +35,18 @@ KV, FlashInfer, and a few Genesis patches are unavailable. What remains:
    Pass `--attention-backend=TRITON_ATTN` as a CLI flag (the env var alone
    is ignored on 0.19.0).
 
-6. **Small-boost env vars** (no downside):
+6. **Small-boost env vars:**
    ```
-   VLLM_USE_FLASHINFER_SAMPLER=1
-   VLLM_ENABLE_CUDAGRAPH_GC=1
-   VLLM_MARLIN_USE_ATOMIC_ADD=1
+   VLLM_ENABLE_CUDAGRAPH_GC=1     # no downside
+   VLLM_MARLIN_USE_ATOMIC_ADD=1   # no downside
+   VLLM_USE_FLASHINFER_SAMPLER=1  # ONLY if MSVC 2022 + ninja are present
    ```
+   `VLLM_USE_FLASHINFER_SAMPLER=1` JIT-compiles a sampling module on the
+   first `profile_run`, which shells out to ninja and `cl.exe`. Without
+   MSVC, EngineCore dies with `FileNotFoundError` in `run_ninja` before
+   the server boots. The shipped snapshots auto-detect MSVC + ninja and
+   set this to `0` (PyTorch fallback) when either is missing. Set
+   manually only if you know both are present.
 
 ## Prefill TPS
 

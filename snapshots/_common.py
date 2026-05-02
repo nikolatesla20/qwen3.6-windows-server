@@ -12,6 +12,7 @@ snapshot. Resolution order:
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -213,6 +214,50 @@ def cuda_env() -> dict:
         file=sys.stderr,
     )
     return {"CUDA_LIB_PATH": str(REPO_ROOT / "python")}
+
+
+def flashinfer_sampler_env(msvc_env_result: dict) -> dict:
+    """Decide whether to enable flashinfer's sampler JIT path.
+
+    vLLM 0.19's sampler can use flashinfer for top-k / top-p masking
+    (small decode boost) when ``VLLM_USE_FLASHINFER_SAMPLER=1``. The
+    catch: flashinfer JIT-compiles a sampling module on the first
+    ``profile_run`` call, which shells out to ninja and cl.exe. If
+    either is missing, EngineCore dies with ``FileNotFoundError``
+    in ``run_ninja`` before the server ever accepts a request.
+
+    Probe:
+      - ``msvc_env_result`` non-empty means vcvars64.bat ran and we
+        have a usable MSVC env in the subprocess (cl.exe will be on
+        PATH for ninja).
+      - ``ninja`` must be discoverable via ``shutil.which`` (it is
+        usually pip-installed as a vLLM transitive dep, but the
+        embedded Python may not have it on PATH).
+
+    If both are satisfied, return ``{"VLLM_USE_FLASHINFER_SAMPLER": "1"}``.
+    Otherwise, set it to ``"0"`` so vLLM falls back to the native
+    PyTorch sampler. The fallback is slightly slower but never JIT-
+    compiles anything, so boots succeed on a vanilla Windows install
+    without MSVC.
+    """
+    if not msvc_env_result:
+        print(
+            "[info] MSVC env not available; setting "
+            "VLLM_USE_FLASHINFER_SAMPLER=0 to skip flashinfer sampler "
+            "JIT (would crash without cl.exe). Native PyTorch sampler "
+            "is used instead, slightly slower but reliable.",
+            file=sys.stderr,
+        )
+        return {"VLLM_USE_FLASHINFER_SAMPLER": "0"}
+    if not shutil.which("ninja"):
+        print(
+            "[info] ninja not on PATH; setting "
+            "VLLM_USE_FLASHINFER_SAMPLER=0. Install ninja "
+            "(pip install ninja) to enable the flashinfer sampler.",
+            file=sys.stderr,
+        )
+        return {"VLLM_USE_FLASHINFER_SAMPLER": "0"}
+    return {"VLLM_USE_FLASHINFER_SAMPLER": "1"}
 
 
 def _resolve_logs_dir() -> Path:

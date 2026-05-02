@@ -24,7 +24,7 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-from _common import VENV, VLLM_EXE, MODEL_PATH, VCVARS, msvc_env, cuda_env, log_path_for, enhanced_jinja_path, resolve_cuda_visible_devices
+from _common import VENV, VLLM_EXE, MODEL_PATH, VCVARS, msvc_env, cuda_env, flashinfer_sampler_env, log_path_for, enhanced_jinja_path, resolve_cuda_visible_devices
 SERVED_NAME = "qwen3.6-27b-autoround"
 HOST = "0.0.0.0"
 PORT = 5002  # baseline 72-tok/s server owns 5001
@@ -72,10 +72,14 @@ def main() -> int:
         return 1
 
     env = os.environ.copy()
-    env.update(msvc_env())
+    _msvc = msvc_env()
+    env.update(_msvc)
     # vLLM 0.19 unconditionally imports flashinfer in the sampler;
     # flashinfer's Windows path raises if CUDA_LIB_PATH is unset.
     env.update(cuda_env())
+    # Toggle the flashinfer sampler based on MSVC + ninja availability,
+    # since flashinfer JIT-compiles a sampling module at first profile_run.
+    env.update(flashinfer_sampler_env(_msvc))
     ENHANCED_JINJA = enhanced_jinja_path()
     if not Path(ENHANCED_JINJA).exists():
         print(f"[ERROR] enhanced jinja template not found: {ENHANCED_JINJA}", file=sys.stderr)
@@ -83,7 +87,6 @@ def main() -> int:
     env["CUDA_VISIBLE_DEVICES"] = resolve_cuda_visible_devices("0,1", 2)
     env["VLLM_SLEEP_WHEN_IDLE"] = "1"
     env["VLLM_ENABLE_CUDAGRAPH_GC"] = "1"
-    env["VLLM_USE_FLASHINFER_SAMPLER"] = "1"
     env["VLLM_ALLOW_LONG_MAX_MODEL_LEN"] = "1"
     env["VLLM_MARLIN_USE_ATOMIC_ADD"] = "1"
     env["RAY_memory_monitor_refresh_ms"] = "0"
