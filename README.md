@@ -133,6 +133,35 @@ Don't have the model yet? See [`docs/MTP_HEAD.md`](docs/MTP_HEAD.md),
 Detailed install (including the wheel-only path for users who already
 have their own venv): [`docs/INSTALL.md`](docs/INSTALL.md).
 
+## Optional: install MSVC 2022 for the small decode boost
+
+The launcher works on a vanilla Windows install, no MSVC required.
+But if you install **Visual Studio 2022 Build Tools** (free, no full
+IDE) with the **"Desktop development with C++"** workload, the
+snapshots auto-detect it and turn on vLLM's flashinfer sampler path,
+which JIT-compiles a faster top-k / top-p kernel on first launch.
+
+What it costs:
+- ~7 GB download, one-time install.
+- Extra 30 to 60 s on the first `profile_run` of each new snapshot
+  while the kernel compiles. Subsequent boots reuse the compiled
+  cache.
+
+What you get:
+- A small but measurable decode boost on the sampler path.
+
+Without MSVC, the snapshots transparently fall back to the PyTorch
+sampler, which never JIT-compiles anything. Boot is faster and the
+server is reliable; you just leave a few percent of decode tok/s on
+the table. The launcher prints a one-line `[info]` at startup telling
+you which path it picked.
+
+Get the Build Tools here:
+https://visualstudio.microsoft.com/downloads/?q=build+tools
+
+ninja (the other half of the JIT toolchain) ships inside the
+launcher zip, you don't need to install it separately.
+
 ## Test it
 
 Once the server is up:

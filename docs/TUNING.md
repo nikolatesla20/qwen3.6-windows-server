@@ -45,8 +45,11 @@ KV, FlashInfer, and a few Genesis patches are unavailable. What remains:
    first `profile_run`, which shells out to ninja and `cl.exe`. Without
    MSVC, EngineCore dies with `FileNotFoundError` in `run_ninja` before
    the server boots. The shipped snapshots auto-detect MSVC + ninja and
-   set this to `0` (PyTorch fallback) when either is missing. Set
-   manually only if you know both are present.
+   set this to `0` (PyTorch fallback) when either is missing. ninja
+   ships in the launcher zip since v0.1.17, so installing the free
+   Visual Studio 2022 Build Tools ("Desktop development with C++"
+   workload) is enough to flip the snapshot probe to `=1` automatically.
+   See the README "Optional: install MSVC 2022" section.
 
 ## Prefill TPS
 

@@ -19,6 +19,26 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
+
+def _add_bundled_ninja_to_path() -> None:
+    """Make the bundled ninja.exe (shipped via build_launcher_zip.py)
+    discoverable by ``shutil.which`` and child-process subprocesses.
+
+    ``pip install --target python\\Lib\\site-packages ninja`` puts the
+    executable at ``python\\Lib\\site-packages\\bin\\ninja.exe``. That
+    path is not on PATH by default, so flashinfer's JIT shells out to
+    ``ninja`` and gets ``FileNotFoundError``. Prepending it here once,
+    at import, propagates into every snapshot's ``env = os.environ.copy()``.
+    """
+    bundled = REPO_ROOT / "python" / "Lib" / "site-packages" / "bin"
+    if (bundled / "ninja.exe").exists():
+        current = os.environ.get("PATH", "")
+        if str(bundled) not in current:
+            os.environ["PATH"] = f"{bundled};{current}"
+
+
+_add_bundled_ninja_to_path()
+
 def _resolve_vllm_exe() -> tuple[Path, Path]:
     """Resolve (PYTHON_HOME, VLLM_EXE).
 
@@ -252,8 +272,10 @@ def flashinfer_sampler_env(msvc_env_result: dict) -> dict:
     if not shutil.which("ninja"):
         print(
             "[info] ninja not on PATH; setting "
-            "VLLM_USE_FLASHINFER_SAMPLER=0. Install ninja "
-            "(pip install ninja) to enable the flashinfer sampler.",
+            "VLLM_USE_FLASHINFER_SAMPLER=0. The portable launcher "
+            "ships ninja under python\\Lib\\site-packages\\bin; if "
+            "you're seeing this in a developer venv, install ninja "
+            "there or add the launcher's bundled path to PATH.",
             file=sys.stderr,
         )
         return {"VLLM_USE_FLASHINFER_SAMPLER": "0"}
