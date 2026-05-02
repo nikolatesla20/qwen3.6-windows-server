@@ -21,6 +21,10 @@ Portable Windows launcher for Qwen3.6-27B inference. Unzip, double-click `start.
 3. Extract anywhere, no admin needed, **including `Program Files` / `Program Files (x86)`**.
 4. Double-click `start.bat`. On first run the launcher auto-discovers existing weights or offers to download Lorbus/Qwen3.6-27B-int4-AutoRound from Hugging Face (~16 GB, public, no token).
 
+## What's new in v0.1.19
+
+- **Result modal is closable.** The benchmark result body is now long enough to push the Close button off-screen on shorter terminals, and the modal had no `Esc` binding. The body is now wrapped in a scroll container, the Close button stays pinned to the bottom, and `Esc` / `Enter` / `q` all dismiss the modal. Same fix applies to every other modal that uses `ResultModal` (Wake-on-LAN result, etc.).
+
 ## What's new in v0.1.18
 
 Two TUI fixes so users don't have to drop to a command line for things the launcher should already do:

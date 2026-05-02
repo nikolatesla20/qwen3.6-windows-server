@@ -43,10 +43,18 @@ class ResultModal(ModalScreen[None]):
         border: solid #58a6ff;
         padding: 1 2;
         width: 90;
-        height: auto;
-        max-height: 80%;
+        height: 80%;
+        layout: vertical;
     }
+    #body-scroll { height: 1fr; }
+    #box Button { margin-top: 1; }
     """
+
+    BINDINGS = [
+        ("escape", "dismiss_modal", "Close"),
+        ("enter", "dismiss_modal", "Close"),
+        ("q", "dismiss_modal", "Close"),
+    ]
 
     def __init__(self, title: str, body: str):
         super().__init__()
@@ -56,10 +64,14 @@ class ResultModal(ModalScreen[None]):
     def compose(self) -> ComposeResult:
         with Vertical(id="box"):
             yield Static(f"[b #58a6ff]{self.title_str}[/]\n")
-            yield Static(self.body)
-            yield Button("Close", id="close")
+            with VerticalScroll(id="body-scroll"):
+                yield Static(self.body)
+            yield Button("Close (Esc)", id="close", variant="primary")
 
     def on_button_pressed(self, ev: Button.Pressed) -> None:
+        self.dismiss(None)
+
+    def action_dismiss_modal(self) -> None:
         self.dismiss(None)
 
 
