@@ -254,6 +254,7 @@ inside this launcher's portable zip.
 
 - [`docs/INSTALL.md`](docs/INSTALL.md) — full install + the bring-your-own-venv path.
 - [`docs/CLAUDE_CODE.md`](docs/CLAUDE_CODE.md) — point Claude Code at the local server (native `/v1/messages`, no proxy).
+- [`docs/UNINSTALL.md`](docs/UNINSTALL.md) — clean removal (it's portable, so just delete folders).
 - [`docs/HARDWARE.md`](docs/HARDWARE.md) — what works, what doesn't, and why.
 - [`docs/COHERENCE.md`](docs/COHERENCE.md) — degenerate-output guide and the 3-tier validator.
 - [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) — every failure mode we've hit.
