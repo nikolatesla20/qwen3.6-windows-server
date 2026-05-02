@@ -283,4 +283,4 @@ please go upstream.
 - [vLLM](https://github.com/vllm-project/vllm), the engine.
 - [SystemPanic/vllm-windows](https://github.com/SystemPanic/vllm-windows), the upstream Windows wheel build infrastructure.
 - [Lorbus](https://huggingface.co/Lorbus), the AutoRound INT4 quant of Qwen3.6-27B that makes any of this fast.
-- [r/LocalLLaMA](https://www.reddit.com/r/LocalLLaMA/), every config in here was informed by their published recipes and brutal honesty in comments.
+- [r/LocalLLaMA](https://www.reddit.com/r/LocalLLaMA/), the configs in here started from recipes posted on the subreddit, and got refined by the honest feedback in the comments.
