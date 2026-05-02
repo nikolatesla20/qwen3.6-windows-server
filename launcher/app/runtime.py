@@ -132,13 +132,73 @@ def start_config(bat_path: str, config_id: str = "") -> None:
     )
 
 
+def _ancestor_chain(pid: int, max_depth: int = 8) -> list[tuple[int, str]]:
+    """Walk parent pids up to max_depth. Returns [(pid, name), ...] starting from pid."""
+    chain: list[tuple[int, str]] = []
+    cur = pid
+    seen: set[int] = set()
+    for _ in range(max_depth):
+        if cur in seen or cur <= 0:
+            break
+        seen.add(cur)
+        try:
+            r = subprocess.run(
+                ["powershell", "-NoProfile", "-Command",
+                 f"$p = Get-CimInstance Win32_Process -Filter 'ProcessId={cur}';"
+                 " if ($p) { \"$($p.ProcessId)|$($p.Name)|$($p.ParentProcessId)\" }"],
+                capture_output=True, text=True, timeout=8,
+                creationflags=CREATE_NO_WINDOW,
+            )
+            line = (r.stdout or "").strip()
+            if not line or "|" not in line:
+                break
+            spid, name, ppid = line.split("|", 2)
+            chain.append((int(spid), name.strip().lower()))
+            cur = int(ppid)
+        except Exception:
+            break
+    return chain
+
+
 def kill_pid(pid: int) -> tuple[bool, str]:
+    """Kill the vLLM process tree AND its parent cmd.exe so the terminal tab closes.
+
+    Process tree on Windows when launched via wt -> cmd /k bat -> python:
+      WindowsTerminal.exe -> OpenConsole.exe -> cmd.exe -> python.exe -> python.exe (workers)
+    taskkill /T from python only kills descendants, leaving cmd.exe alive (because of /k),
+    so the WT tab stays. We additionally locate and kill the parent cmd.exe.
+    """
+    msgs: list[str] = []
+    ok_any = False
+    cmd_pid: int | None = None
+    chain = _ancestor_chain(pid)
+    for ancestor_pid, name in chain[1:]:  # skip self
+        if name == "cmd.exe":
+            cmd_pid = ancestor_pid
+            break
+        if name in ("windowsterminal.exe", "openconsole.exe", "conhost.exe"):
+            break  # don't kill the terminal itself
     try:
         r = subprocess.run(
             ["taskkill", "/F", "/T", "/PID", str(pid)],
             capture_output=True, text=True, timeout=10,
             creationflags=CREATE_NO_WINDOW,
         )
-        return r.returncode == 0, (r.stdout + r.stderr).strip()
+        ok_any = ok_any or (r.returncode == 0)
+        msgs.append(f"py:{(r.stdout + r.stderr).strip()}")
     except Exception as e:
-        return False, str(e)
+        msgs.append(f"py:{e}")
+    if cmd_pid is not None:
+        try:
+            r = subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(cmd_pid)],
+                capture_output=True, text=True, timeout=10,
+                creationflags=CREATE_NO_WINDOW,
+            )
+            ok_any = ok_any or (r.returncode == 0)
+            msgs.append(f"cmd({cmd_pid}):{(r.stdout + r.stderr).strip()}")
+        except Exception as e:
+            msgs.append(f"cmd:{e}")
+    else:
+        msgs.append("cmd:not-found")
+    return ok_any, " | ".join(msgs)

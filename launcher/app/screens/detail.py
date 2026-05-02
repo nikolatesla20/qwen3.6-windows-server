@@ -273,22 +273,43 @@ class DetailScreen(Screen):
         )
 
     def _test_blocking(self, port: int, served: str) -> None:
-        from .. import inference
-        result = inference.test_chat(port, model=served)
-        if not result.get("ok"):
+        try:
+            from .. import inference
+            result = inference.test_chat(port, model=served)
+            if not result.get("ok"):
+                self.app.call_from_thread(
+                    self.app.push_screen,
+                    ResultModal("Test failed", f"[#f85149]{result.get('error','?')}[/]"),
+                )
+                return
+
+            def _fmt(v, spec: str, dash: str = "—") -> str:
+                if v is None:
+                    return dash
+                try:
+                    return format(v, spec)
+                except Exception:
+                    return str(v)
+
+            ttft = _fmt(result.get("ttft_s"), ".2f")
+            total = _fmt(result.get("total_s"), ".2f")
+            decode = _fmt(result.get("decode_tps"), ".1f")
+            text = result.get("text") or "[i #8b949e](empty response)[/]"
+            body = (
+                f"[b]Response:[/] {text}\n\n"
+                f"[#8b949e]prompt_tokens:[/] {result.get('prompt_tokens', 0)}\n"
+                f"[#8b949e]completion_tokens:[/] {result.get('completion_tokens', 0)}\n"
+                f"[#8b949e]TTFT:[/] {ttft}s\n"
+                f"[#8b949e]total:[/] {total}s\n"
+                f"[b #3fb950]decode tok/s: {decode}[/]"
+            )
+            self.app.call_from_thread(
+                self.app.push_screen, ResultModal(f"Test → {self.cfg.id}", body)
+            )
+        except Exception as e:
+            import traceback
+            tb = traceback.format_exc()
             self.app.call_from_thread(
                 self.app.push_screen,
-                ResultModal("Test failed", f"[#f85149]{result.get('error','?')}[/]"),
+                ResultModal("Test crashed", f"[#f85149]{e}[/]\n\n[#8b949e]{tb}[/]"),
             )
-            return
-        body = (
-            f"[b]Response:[/] {result['text']}\n\n"
-            f"[#8b949e]prompt_tokens:[/] {result['prompt_tokens']}\n"
-            f"[#8b949e]completion_tokens:[/] {result['completion_tokens']}\n"
-            f"[#8b949e]TTFT:[/] {result['ttft_s']:.2f}s\n"
-            f"[#8b949e]total:[/] {result['total_s']:.2f}s\n"
-            f"[b #3fb950]decode tok/s: {result['decode_tps']:.1f}[/]"
-        )
-        self.app.call_from_thread(
-            self.app.push_screen, ResultModal(f"Test → {self.cfg.id}", body)
-        )
