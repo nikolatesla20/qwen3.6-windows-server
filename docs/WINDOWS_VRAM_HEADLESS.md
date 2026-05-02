@@ -5,8 +5,7 @@
 > (Chrome, Outlook, Teams, Discord, dbForge, Snagit). For a 24 GB card running
 > a 27B INT4 model in vLLM, that tax is the difference between fitting and
 > OOMing. This doc quantifies the tax, explains why Windows cannot truly run
-> headless the way Linux can, and ranks the workarounds that actually work in
-> late 2025 / early 2026.
+> headless the way Linux can, and ranks the workarounds that actually work.
 
 ## TL;DR
 
