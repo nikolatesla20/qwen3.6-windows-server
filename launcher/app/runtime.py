@@ -31,7 +31,7 @@ def _netstat_pids(ports: list[int]) -> dict[int, int]:
         )
     except Exception:
         return out
-    for line in r.stdout.splitlines():
+    for line in (r.stdout or "").splitlines():
         if "LISTENING" not in line:
             continue
         parts = line.split()
