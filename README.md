@@ -64,7 +64,8 @@ lie.
 > 5090. The unique angle here is **native Windows, no WSL**. Same
 > recipe, no virtualization tax — one community member measured the
 > same hardware going from **85 tok/s in WSL to 160 tok/s in native
-> Ubuntu**. This launcher closes that gap on Windows.
+> Ubuntu** ([reported here](https://www.reddit.com/r/LocalLLaMA/comments/1sw21op/comment/oid8d9n/)).
+> This launcher closes that gap on Windows.
 
 ## Why this exists
 
