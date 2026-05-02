@@ -27,7 +27,7 @@ ships inside the launcher zip.
 
 On a single RTX 3090 (24 GB), running [Lorbus AutoRound INT4](https://huggingface.co/Lorbus/Qwen3.6-27B-int4-AutoRound):
 
-Every snapshot below has the tool-calling fix baked in (PR #35687 + #40861 + `qwen3.5-enhanced.jinja` + `preserve_thinking=false`), so any one of them works with any OpenAI-compatible client, Cline, Cursor, Codex CLI, Continue, LM Studio, OpenWebUI, etc. Just point it at the listed port.
+Every snapshot below has the tool-calling fix baked in (PR #35687 + #40861 + `qwen3.5-enhanced.jinja` + `preserve_thinking=false`), so any one of them works with any OpenAI-compatible client, Claude Code, Cline, Cursor, Codex, OpenCode, KiloCode, LM Studio, etc. Just point it at the listed port.
 
 | Snapshot              | Decode tok/s | Prompt class      | Context | Use it when |
 |-----------------------|--------------|-------------------|---------|-------------|
