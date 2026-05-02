@@ -25,7 +25,7 @@ windows:
 
   configs:
     - id: speed
-      tagline: Speed king — peak decode
+      tagline: Speed king, peak decode
       tier: active
       status: recommended
       bat: '${SNAPSHOTS_DIR}\start_speed.bat'
@@ -41,7 +41,15 @@ windows:
       prefill_tps_cold: 965
       notes: |
         Peak decode config. MTP n=6 at ctx=90k is the sweet spot.
-        Picked from sweep — see compatibility matrix and detail screen for full sweep.
+        Picked from sweep, see compatibility matrix and detail screen
+        for full sweep.
+
+        Also works on a single 3090 with display attached, as long as
+        you close heavy GPU apps (Chrome, Discord, Slack, video playback)
+        before launching. Once vLLM has reserved its KV pool you can
+        reopen them, the driver schedules them around what vLLM
+        already owns. If you can't or won't boot-quiet, use start_gpu0_50k
+        instead.
 
     - id: ctx127k
       tagline: Max ctx single-GPU
@@ -97,7 +105,7 @@ windows:
         Best when you need >127k ctx.
 
     - id: gpu0_50k
-      tagline: GPU0 — needs ≥22GiB free
+      tagline: GPU0 conservative fallback
       tier: active
       status: conditional
       bat: '${SNAPSHOTS_DIR}\start_gpu0_50k.bat'
@@ -113,8 +121,16 @@ windows:
       decode_tps_short: 75.1
       prefill_tps_cold: null
       notes: |
-        Runs on GPU0 — only viable when GPU0 has ≥22GiB free.
-        Decode 56.9 tok/s on 24k prompt; 75.1 on 9k prompt.
+        Conservative fallback for single-3090-with-display when you
+        can't or won't boot-quiet. Lower mem_util (0.92) leaves headroom
+        for whatever the desktop / browser / video grabs after boot,
+        at the cost of capping ctx near 50k.
+
+        If you can close heavy GPU apps during boot, use start_speed
+        instead, it serves the same 3090 with full 90k ctx and the
+        same decode tok/s. Reopen the apps after vLLM finishes booting.
+
+        Decode 56.9 tok/s on 24k prompt, 75.1 on 9k prompt.
 
     - id: ctx121k
       tagline: Legacy 250W max-ctx

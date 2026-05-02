@@ -36,14 +36,23 @@ Every snapshot below has the tool-calling fix baked in (PR #35687 + #40861 + `qw
 | `start_127k`          | 53.4         | long (100 KB)     | 127 k   | Maximum context on a single 3090. |
 | `start_mtp4`          | 58.3         | long (100 KB)     | 120 k   | Mid-balance speed vs context. |
 | `start_pp2_160k` (2 GPU) | 43.5      | long (100 KB)     | 160 k   | Pipeline-parallel for the largest contexts. |
-| `start_gpu0_50k`      | volatile     | mixed             | 9–50 k  | Single-GPU, monitor plugged into the same card. |
+| `start_gpu0_50k`      | 56.9         | mixed             | 9–50 k  | Single-GPU + display, fallback when you can't boot-quiet. |
 
 > **GPU index note.** `start_72tps`, `start_speed`, `start_127k`, and
 > `start_mtp4` pin to **GPU 1** so GPU 0 stays free for the desktop
 > compositor and other apps on a 2× 3090 box. On a single-GPU host the
 > snapshot detects that via `nvidia-smi` and falls back to GPU 0 with a
-> warning, but for a tuned single-GPU run use `start_gpu0_50k` directly.
-> `start_pp2_160k` requires two GPUs.
+> warning. `start_pp2_160k` requires two GPUs.
+
+> **Single 3090 with display attached.** You can run the full
+> `start_speed` snapshot at 90 k context if you close heavy GPU apps
+> (Chrome, Discord, Slack, video playback) **during boot**. Once vLLM
+> has reserved its KV pool, the driver schedules everything else around
+> what vLLM already owns, so you can reopen those apps and they'll
+> behave normally. The danger is reopening them before boot finishes,
+> mid-allocation OOM is what kills runs. If you can't or won't
+> boot-quiet, `start_gpu0_50k` is the conservative fallback (`mem_util
+> 0.92`, ~50 k ctx, same decode tok/s).
 
 Long-prompt rows were measured on a ~100 KB / ~24 k-token Python
 source-summary prompt (a real Windows-service module fed to
@@ -246,10 +255,12 @@ Tuned and measured on:
 Should also work on any Ampere or Ada NVIDIA GPU running Windows 10/11,
 3090, 4090, A6000, etc. **Will not work** on Pascal, Turing, Intel Arc,
 or any AMD card. **Single GPU with the display attached** loses 1–3 GiB
-of VRAM to the desktop compositor and another 2–5 GiB to running apps;
-use the `start_gpu0_50k` snapshot, and read
-[`docs/WINDOWS_VRAM_HEADLESS.md`](docs/WINDOWS_VRAM_HEADLESS.md) for the
-free-up-VRAM playbook.
+of VRAM to the desktop compositor and another 2–5 GiB to running apps,
+but you can still run the full `start_speed` snapshot at 90 k context
+by closing heavy GPU apps (Chrome, Discord, Slack, video playback)
+during boot, then reopening them after vLLM finishes booting. If you
+can't boot-quiet, fall back to `start_gpu0_50k`. Either path is
+covered in [`docs/WINDOWS_VRAM_HEADLESS.md`](docs/WINDOWS_VRAM_HEADLESS.md).
 
 > **RTX 50-series (Blackwell, 5060 / 5070 / 5080 / 5090): not in this
 > wheel yet.** The bundled `vllm-0.19.0+devnen.1` is built against CUDA

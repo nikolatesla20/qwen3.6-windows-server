@@ -9,11 +9,19 @@
 
 ## TL;DR
 
+- **The cheapest fix that costs nothing: boot quiet, then reopen apps.**
+  vLLM allocates its KV pool once at startup. Close Chrome, Discord,
+  Slack, video playback, and other heavy GPU apps **before** launching,
+  then reopen them after `Application startup complete`. Once vLLM has
+  reserved VRAM, the driver schedules everything else around what vLLM
+  already owns. This is enough to run the full `start_speed` snapshot
+  (90 k ctx) on a single display-attached 3090. The danger is reopening
+  apps **before** boot finishes, mid-allocation OOM is what kills runs.
 - **TCC mode is dead on consumer GeForce.** RTX 3090, 4090, and 5090 cannot
   be flipped to TCC. NVIDIA restricts TCC to Quadro / Tesla / data-center
   SKUs and has done so since the Turing era. WDDM is your only option on a
   GeForce card under Windows.
-- **The cheapest real fix is a second GPU for display** (any GT 1030 / RX 6400
+- **The cheapest hardware fix is a second GPU for display** (any GT 1030 / RX 6400
   / used GTX 1650). Plug your monitors into it, set the 3090 to "high
   performance" / not connected to a display, and you reclaim 1.5-4 GiB on the
   compute card. Works on AMD AM4/AM5 systems that have no iGPU.
@@ -70,8 +78,14 @@ against `memory.total`, so on a display-attached 24 GiB card you usually
 want `0.80-0.85` rather than the default `0.90`, otherwise the KV cache
 allocator will collide with whatever Chrome decides to allocate next.
 
-Rule of thumb for a 24 GiB display GPU running a typical office workload:
-**budget 19-20 GiB for vLLM, not 22-23**.
+Two rules of thumb for a 24 GiB display GPU:
+
+- **Boot-quiet pattern:** budget the full ~22 GiB for vLLM. Close heavy
+  GPU apps before launching, reopen after `Application startup
+  complete`. The full `start_speed` snapshot (`mem_util=0.948`, 90 k ctx)
+  works this way.
+- **Steady-state running pattern (apps open at boot):** budget 19-20 GiB
+  for vLLM, not 22-23. Use `start_gpu0_50k` (`mem_util=0.92`, ~50 k ctx).
 
 ## Can Windows run truly headless? (like Linux)
 
@@ -102,6 +116,32 @@ WDDM driver tax even with zero apps open. Everything above that is
 **discretionary** and can be clawed back.
 
 ## Practical workarounds, ranked by effort vs VRAM freed
+
+### 0. Boot quiet, then reopen apps, ~3-5 GiB effectively freed, free, 30 seconds
+
+This is the cheapest fix because vLLM's VRAM allocation happens once,
+at startup, then stays put for the lifetime of the server. What
+matters is what's free at boot, not what's running afterward.
+
+Procedure:
+
+1. Close Chrome, Edge, Brave, Discord, Slack, Teams, Spotify, OBS,
+   anything with hardware acceleration on. Pause any video playback.
+2. Confirm with `nvidia-smi --query-gpu=memory.free --format=csv`. On a
+   24 GiB 3090 with display attached and a clean desktop you should
+   see ~21-22 GiB free.
+3. Launch the snapshot. Wait until the log shows `Application startup
+   complete.` That takes ~90-120 s on a cold boot for 27B INT4.
+4. Reopen everything. They'll allocate around vLLM's existing
+   reservation, the NVIDIA driver schedules per-process VRAM after the
+   initial reservation is fixed.
+
+This is enough to run the full `start_speed` snapshot at 90 k context
+on a single display-attached 3090.
+
+The hard rule: **do not reopen heavy GPU apps before
+`Application startup complete`.** vLLM is still expanding its KV pool
+during boot; a competing allocation in that window OOMs the engine.
 
 ### 1. Move display to iGPU (Intel desktop CPUs only), ~2-4 GiB freed, free
 
@@ -359,13 +399,17 @@ the display driver, CUDA stops working too.
 
 ```
 1× 24 GB GPU, display attached, AMD CPU (no iGPU)
-  └─ Best:  add a $60 GT 1030 for display, leave 3090 compute-only
-  └─ Free:  disable HW accel in Chrome/Teams/Office (#3) + close apps (#4)
-            then start_gpu0 profile, expect 16-32k context for 27B INT4.
+  └─ Try first (free, 30s): boot quiet, reopen apps after vLLM is up (#0).
+            start_speed runs at 90k ctx this way.
+  └─ Best hardware: add a $60 GT 1030 for display, leave 3090 compute-only.
+  └─ If you can't boot-quiet: disable HW accel in Chrome/Teams/Office (#3)
+            + start_gpu0_50k snapshot, expect ~50k context for 27B INT4.
 
 1× 24 GB GPU, display attached, Intel CPU with iGPU
+  └─ Try first (free, 30s): boot quiet, reopen apps after vLLM is up (#0).
+            start_speed runs at 90k ctx this way.
   └─ Best:  route display to iGPU in BIOS + Windows graphics settings (#1).
-            Free, ~3 GiB reclaimed.
+            Free, ~3 GiB reclaimed permanently, no boot-quiet ritual needed.
 
 1× 32 GB GPU (RTX 5090), display attached
   └─ Comfortable. 27B INT4 fits with full context even with the desktop tax.

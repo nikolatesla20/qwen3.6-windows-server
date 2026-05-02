@@ -73,7 +73,10 @@ KV, FlashInfer, and a few Genesis patches are unavailable. What remains:
    vLLM sees free=22.76/24 GiB on GPU1 *after* CUDA context init reserves
    ~1.5 GiB. 0.948 passes; 0.95 trips by ~40 MiB. The 0.92 → 0.94 → 0.948
    progression: each step adds ~0.2 GiB KV / ~6.4 k tokens of ctx ceiling.
-   GPU0 with display: stay at 0.92 max.
+   GPU0 with display: 0.948 is also reachable if you boot-quiet (close
+   heavy GPU apps before launching, reopen after `Application startup
+   complete`). If you can't boot-quiet, stay at 0.92 max, that's the
+   `start_gpu0_50k` path.
 
 3. **Use vLLM's auto-profiler as a context oracle.** Set
    `--max-model-len=200000` (deliberately too high) and read the engine's

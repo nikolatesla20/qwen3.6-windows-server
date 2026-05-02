@@ -92,8 +92,13 @@ The 64.5 and 72 tok/s figures are **single-card decode**. The model and
 KV cache live entirely on one 3090. The reason there are two cards in
 the reference rig is the Windows display tax, the second card is for
 the desktop. With one 3090 driving your monitor you get the same decode
-numbers, just with less context room (use `start_gpu0_50k` for that
-case, expect 9 to 50 k context depending on what is open).
+numbers.
+
+You can also run the full `start_speed` snapshot (90 k ctx) on that
+single display-attached 3090 if you close heavy GPU apps during boot
+and reopen them afterward, see "Boot quiet then reopen" in the next
+section. The fallback is `start_gpu0_50k` for users who can't or won't
+boot-quiet (lower mem_util, capped near 50 k ctx, same decode tok/s).
 
 The only snapshot that actually uses both GPUs for inference is
 `start_pp2_160k` (43.5 tok/s, 160 k context).
@@ -115,15 +120,22 @@ compositor (DWM) before any app is open. Common apps eat more:
 | Heavy: + 4K media + Snagit | ~5–7 GiB |
 
 So a 24 GiB card with the display attached and a typical workload has
-~17–20 GiB *actually free* for vLLM, not 24. Qwen3.6-27B INT4 weights are
-16.96 GiB, plus ~5 GiB of activations, plus you want some KV pool, the
-math breaks at 24 GiB.
+~17–20 GiB *actually free* for vLLM at idle, not 24. Qwen3.6-27B INT4
+weights are 16.96 GiB, plus ~5 GiB of activations, plus you want some
+KV pool, the math is tight at 24 GiB.
 
-**The default snapshots assume your inference card is display-free.** They
-pin `CUDA_VISIBLE_DEVICES=1` and use `--gpu-memory-utilization=0.948`. If
-you only have one GPU, those will OOM. Use [`start_gpu0_50k`](../snapshots/start_gpu0_50k.py)
-which is conservative (lower mem-util, smaller MNBT, modest ctx) and
-expect 9–50 k of usable context depending on what's open.
+**Boot quiet, then reopen apps.** What matters for vLLM is the VRAM
+free **at boot**, not the steady-state load. Close Chrome, Discord,
+Slack, video playback, and other heavy GPU apps before launching, then
+reopen them after `Application startup complete`. Once vLLM has
+reserved its KV pool, the NVIDIA driver schedules everything else
+around what vLLM already owns. With this pattern, the default
+`start_speed` snapshot (`mem_util=0.948`, 90 k ctx) runs cleanly on a
+single display-attached 3090.
+
+**Fallback if you can't boot-quiet:** [`start_gpu0_50k`](../snapshots/start_gpu0_50k.py)
+keeps `mem_util=0.92`, leaving headroom for whatever the desktop grabs
+post-boot. Same decode tok/s, ~50 k ctx ceiling instead of 90 k.
 
 For permanent VRAM relief on a single-GPU system, see
 [`WINDOWS_VRAM_HEADLESS.md`](WINDOWS_VRAM_HEADLESS.md). Short version:
