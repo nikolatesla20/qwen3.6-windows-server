@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-from _common import VENV, VLLM_EXE, MODEL_PATH, VCVARS, msvc_env, cuda_env, flashinfer_sampler_env, log_path_for, enhanced_jinja_path, resolve_cuda_visible_devices
+from _common import VENV, VLLM_EXE, MODEL_PATH, VCVARS, msvc_env, cuda_env, flashinfer_sampler_env, log_path_for, enhanced_jinja_path, resolve_cuda_visible_devices, print_port_collision_banner
 SERVED_NAME = "qwen3.6-27b-autoround"
 HOST = "0.0.0.0"
 PORT = 5001
@@ -64,7 +64,9 @@ def main() -> int:
         print(f"[ERROR] Model dir not found: {MODEL_PATH}", file=sys.stderr)
         return 1
     if port_in_use(HOST, PORT):
-        print(f"[ERROR] Port {PORT} already in use.", file=sys.stderr)
+        print_port_collision_banner(PORT)
+        try: input("Press Enter to close...")
+        except EOFError: pass
         return 1
 
     env = os.environ.copy()

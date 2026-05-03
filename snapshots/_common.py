@@ -424,6 +424,26 @@ def write_manifest(*, snapshot_py: Path | str, port: int, wrapper_pid: int,
     return target
 
 
+def print_port_collision_banner(port: int) -> None:
+    """Print a loud, multi-line banner explaining a port-in-use exit.
+
+    Snapshots use ``cmd /k`` so the WT tab stays open after the script
+    returns, but a single ``[ERROR] Port X already in use`` line scrolls
+    away in setup noise. This banner gives the user a clear "this is
+    why" + "this is what to do" block right above the ``input()`` pause
+    in each ``start_*.py``.
+    """
+    bar = "=" * 60
+    print("", flush=True)
+    print(bar, flush=True)
+    print(f"  PORT {port} ALREADY IN USE", flush=True)
+    print(bar, flush=True)
+    print("  Another snapshot is already serving on this port.", flush=True)
+    print("  Stop it from the launcher (Unload), or change this", flush=True)
+    print("  snapshot's port via the launcher's Edit Snapshots screen.", flush=True)
+    print(bar, flush=True)
+
+
 def clear_manifest(port: int) -> None:
     try:
         manifest_path_for(port).unlink()

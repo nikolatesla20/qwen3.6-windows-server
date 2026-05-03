@@ -384,6 +384,23 @@ class DetailScreen(Screen):
 
     def _do_load(self) -> None:
         cfg = self.cfg
+        # Port-collision pre-check: if another running snapshot already owns
+        # this port, the new wrapper would silently exit on bind, leaving
+        # the dashboard correctly lit on the *other* config. The user reads
+        # that as "wrong card lit" (issue #2 follow-up). Refuse the launch
+        # with a clear message instead.
+        conflict = next(
+            (rp for cid, rp in self.app.running.items()
+             if cid != cfg.id and rp.port == cfg.port),
+            None,
+        )
+        if conflict is not None:
+            self.app.notify(
+                f"Port {cfg.port} is in use by '{conflict.matched_id or conflict.pid}'. "
+                f"Unload it first, or change {cfg.id}'s port via Edit Snapshots.",
+                severity="error", timeout=8,
+            )
+            return
         def _yes(ok: bool):
             if ok:
                 from .. import runtime
