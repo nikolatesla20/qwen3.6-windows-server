@@ -21,6 +21,23 @@ Portable Windows launcher for Qwen3.6-27B inference. Unzip, double-click `start.
 3. Extract anywhere, no admin needed, **including `Program Files` / `Program Files (x86)`**.
 4. Double-click `start.bat`. On first run the launcher auto-discovers existing weights or offers to download Lorbus/Qwen3.6-27B-int4-AutoRound from Hugging Face (~16 GB, public, no token).
 
+## What's new in v1.1
+
+Three new ready-to-go snapshots that pair Unsloth's recommended sampler settings with the right thinking-mode toggle, so you don't have to hand-edit a JSON or a snapshot file to get the workload-tuned defaults:
+
+- **`start_instruct_general`** — non-thinking mode, temp 0.7 / top_p 0.8 / top_k 20 / min_p 0.0 (Unsloth's Instruct-general row). 127k context. For chat, Q&A, summarisation, general writing where you don't want the `<think>` block.
+- **`start_instruct_coding`** — non-thinking mode, temp 0.6 / top_p 0.95 / top_k 20 / min_p 0.0 (Unsloth's Instruct-coding row). 127k context. For tool-heavy coding agents (Cline, Continue, Codex, Roo, Cursor) that want crisp, low-randomness output.
+- **`start_thinking_coding`** — thinking mode left on, temp 0.6 / top_p 0.95 / top_k 20 / min_p 0.0 (Unsloth's Thinking-precise-coding row). 127k context. For code review, debugging, and architecture-level reasoning where the `<think>` trace adds value but you still want tighter sampling than the default thinking-mode temp 1.0.
+
+All three use `--override-generation-config` to bake the sampler defaults into the running server, and the non-thinking pair uses `--default-chat-template-kwargs={"preserve_thinking": false, "enable_thinking": false}` to flip the model into Instruct mode at the template level. Per-request sampler params from your client (Cline / Cursor / Codex, etc.) still override these defaults.
+
+Also in this release, two reliability fixes:
+
+- **MSVC detection now uses `vswhere.exe` instead of hardcoded `\Microsoft Visual Studio\2022\` paths.** VS 2026 (= internal version 18.x, installed under `\2026\`) and any non-default install layout were silently missed by the old probe, which then printed a `vcvars64.bat not found` warning and disabled the FlashInfer sampler boost even when MSVC was actually available. New probe shells out to vswhere with `-requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64` and falls back to the hardcoded VS 2022 list when vswhere is missing.
+- **TROUBLESHOOTING.md adds rows for the vswhere fix and the `cudart64_120.dll` mismatch workaround** (copy `cudart64_12.dll`, rename to `cudart64_120.dll`, place side by side) reported in the wild by an ev8siv3-style setup with VS 2026 and a non-default CUDA Toolkit layout.
+
+Docs also gained: a Windows-paths tool-call gotcha in `docs/CLAUDE_CODE.md`, an LM Studio streaming-penalty section in `docs/COMPARISON.md`, and a 3x-small-card guidance section in `docs/HARDWARE.md`.
+
 ## What's new in v0.1.20
 
 - **Copy button on the result modal.** A new green "Copy (C)" button next to "Close" copies the title + body to the system clipboard with rich-text markup stripped, so it pastes cleanly into a GitHub issue, Reddit comment, or Discord message. Press `c` to copy, `Esc` or `q` to dismiss.

@@ -132,6 +132,75 @@ windows:
 
         Decode 56.9 tok/s on 24k prompt, 75.1 on 9k prompt.
 
+    - id: instruct_general
+      tagline: Instruct (non-thinking), general
+      tier: active
+      status: recommended
+      bat: '${SNAPSHOTS_DIR}\start_instruct_general.bat'
+      py:  '${SNAPSHOTS_DIR}\start_instruct_general.py'
+      gpu: GPU1
+      tp: 1
+      pp: 1
+      mem_util: 0.948
+      mtp_n: 3
+      ctx: 127000
+      port: 5001
+      decode_tps: 53.4
+      prefill_tps_cold: 965
+      notes: |
+        Non-thinking mode for chat, Q&A, summarisation, general writing.
+        Sampler defaults: temperature 0.7, top_p 0.8, top_k 20, min_p 0.0
+        (Unsloth's recommended Instruct-general row). Thinking is
+        disabled in the chat template so the model goes straight to the
+        answer. Per-request sampler params still override these
+        defaults. Same speed and context as ctx127k.
+
+    - id: instruct_coding
+      tagline: Instruct (non-thinking), coding
+      tier: active
+      status: recommended
+      bat: '${SNAPSHOTS_DIR}\start_instruct_coding.bat'
+      py:  '${SNAPSHOTS_DIR}\start_instruct_coding.py'
+      gpu: GPU1
+      tp: 1
+      pp: 1
+      mem_util: 0.948
+      mtp_n: 3
+      ctx: 127000
+      port: 5001
+      decode_tps: 53.4
+      prefill_tps_cold: 965
+      notes: |
+        Non-thinking mode tuned for coding agents (Cline, Continue,
+        Codex, Roo, Cursor). Sampler defaults: temperature 0.6,
+        top_p 0.95, top_k 20, min_p 0.0 (Unsloth's recommended
+        Instruct-coding row). Thinking disabled. Per-request sampler
+        params still override.
+
+    - id: thinking_coding
+      tagline: Thinking, precise coding
+      tier: active
+      status: recommended
+      bat: '${SNAPSHOTS_DIR}\start_thinking_coding.bat'
+      py:  '${SNAPSHOTS_DIR}\start_thinking_coding.py'
+      gpu: GPU1
+      tp: 1
+      pp: 1
+      mem_util: 0.948
+      mtp_n: 3
+      ctx: 127000
+      port: 5001
+      decode_tps: 53.4
+      prefill_tps_cold: 965
+      notes: |
+        Thinking mode with sampler tuned for code review, debugging,
+        and architecture-level reasoning. Sampler defaults:
+        temperature 0.6, top_p 0.95, top_k 20, min_p 0.0 (Unsloth's
+        Thinking-precise-coding row). Thinking is left enabled so the
+        model writes a <think> block before answering. Use when the
+        reasoning trace adds value but you want tighter, code-friendly
+        sampling than the thinking-mode default (temp 1.0).
+
     - id: ctx121k
       tagline: Legacy 250W max-ctx
       tier: legacy
