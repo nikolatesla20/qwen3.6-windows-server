@@ -315,6 +315,73 @@ def log_path_for(port: int) -> Path:
     return LOGS_DIR / f"vllm_server.{port}.log"
 
 
+# ---------------------------------------------------------------------------
+# Runtime manifest — the launcher's source of truth for "what's running"
+#
+# Each snapshot writes <LOGS_DIR>/runtime/<port>.json on boot identifying
+# itself by snapshot script filename. The launcher reads these to decide
+# which card to light + enable Test/Unload, with no dependence on parsing
+# localized netstat output or matching ambiguous --max-model-len cmdline
+# fragments. Stale manifests are GC'd by the reader when port/pid checks
+# fail. See launcher/app/manifest.py for the read side.
+# ---------------------------------------------------------------------------
+
+def runtime_dir() -> Path:
+    d = LOGS_DIR / "runtime"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def manifest_path_for(port: int) -> Path:
+    return runtime_dir() / f"{port}.json"
+
+
+def write_manifest(*, snapshot_py: Path | str, port: int, wrapper_pid: int,
+                   max_model_len: int | None = None,
+                   mtp_n: int | None = None,
+                   tp: int = 1, pp: int = 1) -> Path:
+    """Atomically write <LOGS_DIR>/runtime/<port>.json with snapshot identity.
+
+    snapshot_id is derived from the .py filename (e.g. start_speed.py ->
+    "start_speed") which uniquely identifies the snapshot. The launcher
+    matches this against the basename of each config's `bat`/`py` field.
+    """
+    import json, tempfile, datetime
+    p = Path(snapshot_py)
+    payload = {
+        "snapshot_id": p.stem,                  # e.g. "start_speed"
+        "snapshot_py": p.name,                  # e.g. "start_speed.py"
+        "snapshot_bat": p.with_suffix(".bat").name,  # e.g. "start_speed.bat"
+        "port": int(port),
+        "wrapper_pid": int(wrapper_pid),
+        "max_model_len": max_model_len,
+        "mtp_n": mtp_n,
+        "tp": tp,
+        "pp": pp,
+        "started_at": datetime.datetime.now().isoformat(timespec="seconds"),
+    }
+    target = manifest_path_for(port)
+    fd, tmp = tempfile.mkstemp(prefix=f".{port}.", suffix=".json", dir=str(runtime_dir()))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2)
+        os.replace(tmp, target)
+    except Exception:
+        try: os.unlink(tmp)
+        except OSError: pass
+        raise
+    return target
+
+
+def clear_manifest(port: int) -> None:
+    try:
+        manifest_path_for(port).unlink()
+    except FileNotFoundError:
+        pass
+    except OSError:
+        pass
+
+
 # Path to the vendored Qwen3.5 enhanced jinja chat template. Lives under
 # the vllm-windows repo (next to the patched wheel source). End-user
 # portable installs symlink/copy it into ${VLLM_WINDOWS_TEMPLATES} so

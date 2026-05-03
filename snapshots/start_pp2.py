@@ -160,6 +160,18 @@ def main() -> int:
         text=True, encoding="utf-8", errors="replace",
     )
 
+    try:
+        from _common import write_manifest
+        _mf = write_manifest(
+            snapshot_py=Path(__file__),
+            port=PORT, wrapper_pid=os.getpid(),
+            max_model_len=CTX, mtp_n=NGRAM_NUM_SPEC_TOKENS if USE_NGRAM else None,
+            tp=TP, pp=PP,
+        )
+        print(f"[launcher] runtime manifest -> {_mf}")
+    except Exception as _mfe:
+        print(f"[launcher] manifest write failed (non-fatal): {_mfe}", file=sys.stderr)
+
     import threading
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -182,10 +194,18 @@ def main() -> int:
     signal.signal(signal.SIGTERM, _forward)
 
     try:
-        return proc.wait()
-    except KeyboardInterrupt:
-        proc.terminate()
-        return proc.wait()
+        try:
+            _rc = proc.wait()
+        except KeyboardInterrupt:
+            proc.terminate()
+            _rc = proc.wait()
+        return _rc
+    finally:
+        try:
+            from _common import clear_manifest
+            clear_manifest(PORT)
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

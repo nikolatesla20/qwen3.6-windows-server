@@ -67,34 +67,172 @@ _RE_LEN = re.compile(r"--max-model-len[= ](\d+)")
 _RE_MTP = re.compile(r'num_speculative_tokens"\s*:\s*(\d+)')
 
 
+def _logs_dir() -> Path:
+    """Mirror snapshots/_common._resolve_logs_dir() — write-tolerant."""
+    env = os.environ.get("VLLM_WINDOWS_LOGS")
+    if env:
+        return Path(env)
+    here = Path(__file__).resolve()
+    repo = here.parents[2] if len(here.parents) >= 3 else here.parent
+    candidate = repo / "logs"
+    try:
+        candidate.mkdir(parents=True, exist_ok=True)
+        return candidate
+    except OSError:
+        base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~\\AppData\\Local")
+        return Path(base) / "qwen36-windows-server" / "logs"
+
+
+def _manifest_dir() -> Path:
+    return _logs_dir() / "runtime"
+
+
+def _read_manifests() -> list[dict]:
+    """Read all <logs>/runtime/<port>.json. Returns list of dicts."""
+    import json
+    d = _manifest_dir()
+    if not d.exists():
+        return []
+    out: list[dict] = []
+    for p in d.glob("*.json"):
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+            data["__path__"] = str(p)
+            out.append(data)
+        except (OSError, ValueError):
+            try: p.unlink()
+            except OSError: pass
+    return out
+
+
+def _port_listening(port: int, host: str = "127.0.0.1") -> bool:
+    """Locale-free port check — connect attempt, no netstat parsing."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.3)
+        try:
+            s.connect((host, port))
+            return True
+        except OSError:
+            return False
+
+
+def _pid_alive(pid: int) -> bool:
+    """Locale-free PID liveness via tasklist /fi (exit code, not text)."""
+    try:
+        r = subprocess.run(
+            ["tasklist", "/FI", f"PID eq {pid}", "/NH", "/FO", "CSV"],
+            capture_output=True, text=True, timeout=5,
+            creationflags=CREATE_NO_WINDOW,
+        )
+        # When PID exists, stdout has a CSV row starting with a quoted image name.
+        # When absent, stdout is "INFO: No tasks..." (locale text varies) — but
+        # the row form is quote-prefixed, locale-stable.
+        return bool((r.stdout or "").lstrip().startswith('"'))
+    except Exception:
+        return True  # fail-open: don't GC a manifest just because tasklist hiccuped
+
+
+def _bat_basename(c) -> str:
+    """Resolve the snapshot bat basename from a config (configs.yaml `bat:` field)."""
+    raw = (c.bat or "").replace("/", "\\")
+    return raw.rsplit("\\", 1)[-1].lower()
+
+
 def detect_running(ports: list[int], configs) -> dict[str, RunningProc]:
-    """Return {config_id: RunningProc} for matched configs."""
-    pid_by_port = _netstat_pids(ports)
+    """Return {config_id: RunningProc} for matched configs.
+
+    Primary path: read manifests written by snapshots on boot. Each manifest
+    names the snapshot_id (== bat/py basename) authoritatively, so port
+    collisions (start_speed/start_127k/start_mtp4 all on 5001) resolve
+    correctly. We then verify the port is actually listening and the
+    wrapper pid is still alive — both via locale-free probes (no netstat
+    "LISTENING" parse, no Win32_Process WMI).
+
+    Fallback: legacy port-only match for processes started before the
+    manifest code shipped (no manifest exists). This preserves the prior
+    behavior for pre-upgrade running servers.
+    """
     result: dict[str, RunningProc] = {}
-    for port, pid in pid_by_port.items():
-        cmd = _cmdline_for(pid)
-        m1 = _RE_LEN.search(cmd)
-        m2 = _RE_MTP.search(cmd)
-        ml = int(m1.group(1)) if m1 else None
-        mn = int(m2.group(1)) if m2 else None
-        proc = RunningProc(pid=pid, port=port, cmdline=cmd, max_model_len=ml, mtp_n=mn)
-        # match against configs
-        for c in configs:
-            if c.port != port:
-                continue
-            if ml is not None and c.ctx == ml:
-                if mn is None and c.mtp_n is None:
-                    proc.matched_id = c.id; break
-                if mn is not None and c.mtp_n == mn:
-                    proc.matched_id = c.id; break
-        if proc.matched_id is None:
-            # fallback: just port match
+    matched_ports: set[int] = set()
+
+    # ------- Primary: manifest-driven --------
+    by_bat = {_bat_basename(c): c for c in configs}
+    for mf in _read_manifests():
+        port = int(mf.get("port") or 0)
+        if not port:
+            continue
+        # Verify port is listening; if not, manifest is stale → GC.
+        if not _port_listening(port):
+            try: Path(mf["__path__"]).unlink()
+            except (OSError, KeyError): pass
+            continue
+        # Optional: verify wrapper pid alive. If dead but port still bound,
+        # something else owns the port — keep manifest, trust port match.
+        wrapper_pid = int(mf.get("wrapper_pid") or 0)
+        if wrapper_pid and not _pid_alive(wrapper_pid):
+            # Port still listening means another process inherited it, or
+            # the wrapper died but the API server child survived. The
+            # manifest's snapshot_id is still our best identity guess —
+            # don't GC, but don't trust pid for kills.
+            pass
+
+        snap_bat = (mf.get("snapshot_bat") or "").lower()
+        cfg = by_bat.get(snap_bat)
+        if cfg is None:
+            continue  # manifest references an unknown snapshot
+
+        # Resolve the netstat pid for kill_pid — fall back to wrapper_pid.
+        pid = wrapper_pid
+        np = _netstat_pids([port]).get(port)
+        if np:
+            pid = np
+
+        proc = RunningProc(
+            pid=pid, port=port, cmdline="<from-manifest>",
+            max_model_len=mf.get("max_model_len"),
+            mtp_n=mf.get("mtp_n"),
+            matched_id=cfg.id,
+        )
+        result[cfg.id] = proc
+        matched_ports.add(port)
+
+    # ------- Fallback: legacy netstat (process predates manifest support) -------
+    legacy_ports = [p for p in ports if p not in matched_ports]
+    if legacy_ports:
+        pid_by_port = _netstat_pids(legacy_ports)
+        for port, pid in pid_by_port.items():
+            cmd = _cmdline_for(pid)
+            m1 = _RE_LEN.search(cmd)
+            m2 = _RE_MTP.search(cmd)
+            ml = int(m1.group(1)) if m1 else None
+            mn = int(m2.group(1)) if m2 else None
+            proc = RunningProc(pid=pid, port=port, cmdline=cmd,
+                               max_model_len=ml, mtp_n=mn)
             for c in configs:
-                if c.port == port:
-                    proc.matched_id = c.id; break
-        if proc.matched_id:
-            result[proc.matched_id] = proc
+                if c.port != port:
+                    continue
+                if ml is not None and c.ctx == ml:
+                    if mn is None and c.mtp_n is None:
+                        proc.matched_id = c.id; break
+                    if mn is not None and c.mtp_n == mn:
+                        proc.matched_id = c.id; break
+            if proc.matched_id is None:
+                for c in configs:
+                    if c.port == port:
+                        proc.matched_id = c.id; break
+            if proc.matched_id and proc.matched_id not in result:
+                result[proc.matched_id] = proc
     return result
+
+
+def clear_manifest_for_port(port: int) -> None:
+    """Remove <logs>/runtime/<port>.json — called after a successful kill."""
+    try:
+        (_manifest_dir() / f"{port}.json").unlink()
+    except FileNotFoundError:
+        pass
+    except OSError:
+        pass
 
 
 def _wt_exe() -> str | None:
@@ -345,5 +483,11 @@ def kill_pid(pid: int, port: int | None = None) -> tuple[bool, str]:
             time.sleep(0.4)
         else:
             msgs.append(f"port({port}):still-busy")
+
+    # 8) GC the runtime manifest so the dashboard stops showing this card
+    #    as RUNNING. Snapshots also clear it on clean exit, but external
+    #    kills (this code path) need to unlink themselves.
+    if port is not None:
+        clear_manifest_for_port(port)
 
     return ok_any, " | ".join(msgs)
