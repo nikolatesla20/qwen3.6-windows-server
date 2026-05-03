@@ -58,7 +58,8 @@ class SnapshotManageScreen(Screen[bool]):
     #sm-body { height: 1fr; }
     #sm-left { width: 40; min-width: 32; max-width: 48;
                background: #11161d; border-right: solid #30363d; }
-    #sm-right { width: 1fr; padding: 0 2; }
+    #sm-right { width: 1fr; padding: 0 2; layout: vertical; }
+    #sm-form-scroll { height: 1fr; }
 
     .sm-section-title {
         color: #58a6ff;
@@ -70,11 +71,18 @@ class SnapshotManageScreen(Screen[bool]):
     #sm-list {
         height: 1fr;
         background: #11161d;
+        scrollbar-size: 0 0;
     }
-    ListView > ListItem.--highlight {
-        background: #1f3a5f;
+    #sm-list > ListItem {
+        padding: 0 1;
+        background: #11161d;
     }
-    #sm-list ListItem { padding: 0 1; }
+    #sm-list > ListItem.-highlight {
+        background: #161b22;
+    }
+    #sm-list:focus > ListItem.-highlight {
+        background: #1a2733;
+    }
 
     #sm-list-buttons {
         height: 3;
@@ -185,43 +193,43 @@ class SnapshotManageScreen(Screen[bool]):
                     yield Button("New", id="sm-btn-new", classes="sm-btn-primary")
                     yield Button("Duplicate", id="sm-btn-dup")
                     yield Button("Delete", id="sm-btn-del", classes="sm-btn-danger")
-            with VerticalScroll(id="sm-right"):
+            with Vertical(id="sm-right"):
                 yield Static("Edit Snapshot", classes="sm-section-title")
-
-                with Horizontal(classes="sm-row"):
-                    yield Label("ID (snapshot key)")
-                    yield Input(placeholder="e.g. speed, ctx127k, my_custom",
-                                id="sm-in-id")
-                with Horizontal(classes="sm-row"):
-                    yield Label("Tagline")
-                    yield Input(placeholder="Speed king, peak decode",
-                                id="sm-in-tagline")
-
-                with Horizontal(classes="sm-pill-row", id="sm-row-tier"):
-                    yield Label("Tier")
-                    for t in _TIERS:
-                        yield Static(t, id=f"sm-tier-{t}", classes="sm-pill")
-                    yield Static("", classes="sm-pill-spacer")
-                with Horizontal(classes="sm-pill-row", id="sm-row-status"):
-                    yield Label("Status")
-                    for s in _STATUSES:
-                        yield Static(s, id=f"sm-status-{s}", classes="sm-pill")
-                    yield Static("", classes="sm-pill-spacer")
-                with Horizontal(classes="sm-pill-row", id="sm-row-gpu"):
-                    yield Label("GPU")
-                    for g in _GPUS:
-                        yield Static(g, id=f"sm-gpu-{g.replace('+','p')}",
-                                     classes="sm-pill")
-                    yield Static("", classes="sm-pill-spacer")
-
-                for fid, lab, _ in _NUMERIC_FIELDS:
+                with VerticalScroll(id="sm-form-scroll"):
                     with Horizontal(classes="sm-row"):
-                        yield Label(lab)
-                        yield Input(placeholder="", id=f"sm-in-{fid}", type="text")
+                        yield Label("ID (snapshot key)")
+                        yield Input(placeholder="e.g. my_64k", id="sm-in-id")
+                    with Horizontal(classes="sm-row"):
+                        yield Label("Tagline (one line)")
+                        yield Input(placeholder="Short description",
+                                    id="sm-in-tagline")
 
-                with Horizontal(id="sm-notes-row"):
-                    yield Label("Notes (free text)")
-                    yield TextArea("", id="sm-notes")
+                    with Horizontal(classes="sm-pill-row", id="sm-row-tier"):
+                        yield Label("Tier")
+                        for t in _TIERS:
+                            yield Static(t, id=f"sm-tier-{t}", classes="sm-pill")
+                        yield Static("", classes="sm-pill-spacer")
+                    with Horizontal(classes="sm-pill-row", id="sm-row-status"):
+                        yield Label("Status")
+                        for s in _STATUSES:
+                            yield Static(s, id=f"sm-status-{s}", classes="sm-pill")
+                        yield Static("", classes="sm-pill-spacer")
+                    with Horizontal(classes="sm-pill-row", id="sm-row-gpu"):
+                        yield Label("GPU")
+                        for g in _GPUS:
+                            yield Static(g, id=f"sm-gpu-{g.replace('+','p')}",
+                                         classes="sm-pill")
+                        yield Static("", classes="sm-pill-spacer")
+
+                    for fid, lab, _ in _NUMERIC_FIELDS:
+                        with Horizontal(classes="sm-row"):
+                            yield Label(lab)
+                            yield Input(placeholder="", id=f"sm-in-{fid}",
+                                        type="text")
+
+                    with Horizontal(id="sm-notes-row"):
+                        yield Label("Notes (free text)")
+                        yield TextArea("", id="sm-notes")
 
                 with Horizontal(id="sm-form-buttons"):
                     yield Button("Save [Ctrl+S]", id="sm-btn-save",
