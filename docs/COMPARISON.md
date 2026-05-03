@@ -22,6 +22,15 @@ context. Decode falls off sharply with context (one user reported 50
 to 60 tok/s at 4 k context dropping to 5 tok/s at 8 k due to KV cache
 pressure), so the headline number is best-case.
 
+A Reddit user (Kadeshar) posted a same-machine head-to-head on a 3090
+at 90 k context: this server delivered 36 to 55 tok/s consistently
+across streaming and non-streaming, both at 390 W and at a 280 W power
+cap. LM Studio on the same hardware delivered 36 to 38 tok/s
+non-streaming but only 5 to 13 tok/s when streaming was enabled, a 3x
+to 7x streaming penalty. If you compare the two tools and only look at
+non-streaming numbers, the gap looks smaller than it really is for an
+agent workflow that always streams.
+
 ## Why this is faster than Ollama / LM Studio / llama.cpp
 
 Three reasons, all stack-level not config-level:

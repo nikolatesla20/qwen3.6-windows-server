@@ -98,6 +98,17 @@ refused, the server isn't ready yet.
 - **Don't run two snapshots on the same port.** If you switch
   snapshots, stop the previous one first (the launcher does this for
   you, or use `snapshots\stop_vllm.bat`).
+- **Windows paths in tool-call arguments can break JSON parsing.**
+  Qwen3.6 sometimes emits a single backslash inside a JSON string when
+  file paths land in tool arguments (`C:\Users\...` instead of
+  `C:\\Users\\...`), which makes the call fail to parse. This is a
+  model-side issue, not Windows-specific (it also reproduces on Linux
+  vLLM and llama.cpp), but Windows users hit it more because their
+  paths are full of backslashes. The cheap fix is a one-liner in your
+  agent's system prompt: *"I am on a Windows system, so properly
+  escape directory backslashes to keep from breaking JSON."* Once the
+  model knows the target, it escapes correctly. Reported and confirmed
+  by a Reddit user running OpenCode against this server.
 
 ## Other clients
 

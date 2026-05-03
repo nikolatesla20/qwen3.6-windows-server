@@ -86,6 +86,30 @@ than to split 27B unevenly. Mixed-arch combos (Ada + Ampere, Blackwell
 + Blackwell) are theoretically fine for PP but untested. Always boot
 single-card first to confirm the wheel loads, then add the second.
 
+## Three or more identical small Ampere cards (e.g. 3x RTX 3060 12 GB)
+
+PP=3 across three 12 GB cards fits the 27B INT4 weights on paper
+(roughly 5.7 GiB per card for the model, plus activations and KV), but
+this combo is **untested** on this launcher and the shipped snapshots
+only cover single-GPU and 2-GPU PP. Two practical caveats even if you
+hand-edit a snapshot to try it:
+
+- **No MTP.** PP + MTP is broken on this wheel
+  (`SupportsPP NotImplementedError`), so you lose the speculative
+  decoding multiplier. Decode caps somewhere below `start_pp2_160k`'s
+  43 tok/s, possibly well below it once you add a third pipeline
+  hop's worth of cross-card hand-off.
+- **PCIe lane constraints matter.** Three cards on x4 / x1 risers
+  push more data over slower links per token, which compounds the
+  PP hand-off cost.
+
+For a typical 3x 3060 setup, running a smaller model (Qwen3-14B INT4)
+on a single card is usually a faster, less fiddly experience than
+splitting 27B three ways. The other two cards are then free for other
+workloads (image gen, a second model, etc.). If you do try the PP=3
+path and get coherent output, please post numbers, validated configs
+for >2-card setups would be welcome PRs.
+
 ## How to read the headline tok/s numbers
 
 The 64.5 and 72 tok/s figures are **single-card decode**. The model and
