@@ -17,7 +17,9 @@
 A small portable Windows app that gives you an OpenAI-compatible API
 serving Qwen3.6-27B locally, with config presets that I actually
 measured myself. The launcher is a Textual TUI: arrow keys, Enter
-to start a snapshot, Esc to stop. That's the whole UX.
+to start a snapshot, Esc to stop. Press `e` to add, edit, duplicate, or
+delete your own snapshot configs from inside the TUI, no hand-editing
+files. That's the whole UX.
 
 It is the matching launcher for the [`devnen/vllm-windows`](https://github.com/devnen/vllm-windows)
 patched wheel, but you don't need to know or care about that. The wheel
@@ -280,7 +282,7 @@ your own tuning, that's fine, please share what you find.
 > **Scope.** This launcher serves Qwen3.6-27B specifically through a
 > fixed set of validated snapshots. It is not a general vLLM server you
 > can point at any model. Adding configs for smaller Qwen variants is
-> straightforward (see [`snapshots/README.md`](snapshots/README.md));
+> straightforward (see [`docs/SNAPSHOTS.md`](docs/SNAPSHOTS.md));
 > running unrelated models like ACE-Step, Stable Diffusion, or other
 > diffusion / multimodal stacks is out of scope.
 
@@ -323,6 +325,7 @@ inside this launcher's portable zip.
 - [`docs/TUNING.md`](docs/TUNING.md), the lever set, anti-levers, how to sweep your own configs.
 - [`docs/MTP_HEAD.md`](docs/MTP_HEAD.md), why Lorbus AutoRound is the only INT4 quant that works.
 - [`docs/SPEC_DECODE_MATRIX.md`](docs/SPEC_DECODE_MATRIX.md), what spec-decode + parallelism combos work.
+- [`docs/SNAPSHOTS.md`](docs/SNAPSHOTS.md), managing snapshots from inside the TUI: keyboard shortcuts, the CRUD editor, flag invariants, hand-edit fallback.
 - [`docs/WINDOWS_VRAM_HEADLESS.md`](docs/WINDOWS_VRAM_HEADLESS.md), free VRAM on Windows for single-GPU.
 - [`docs/HALLUCINATED_FLAGS.md`](docs/HALLUCINATED_FLAGS.md), flags from web search results that don't exist on this wheel.
 - [`docs/CREDITS.md`](docs/CREDITS.md), vLLM team, SystemPanic, Lorbus, the community.
@@ -349,7 +352,7 @@ Configs I'd love to see:
 - 4090 / 5090 / 5060 Ti / A6000 tunings
 - New parallelism or KV-cache combos as vLLM adds them
 
-How to add a snapshot: [`snapshots/README.md`](snapshots/README.md).
+How to add a snapshot: [`docs/SNAPSHOTS.md`](docs/SNAPSHOTS.md) (in-TUI editor and hand-edit fallback).
 
 This project is intentionally narrow scope: **Windows + Ampere/Ada/Blackwell
 NVIDIA**. PRs for other operating systems or GPU vendors are politely
