@@ -237,6 +237,22 @@ def detect_running(ports: list[int], configs) -> dict[str, RunningProc]:
     return result
 
 
+def probe_ready(port: int, host: str = "127.0.0.1", timeout: float = 0.8) -> bool:
+    """True iff the vLLM API is actually serving requests on this port.
+
+    Distinguishes "vLLM is loading weights / compiling kernels" (port may or
+    may not be bound, /v1/models 404s or hangs) from "vLLM is ready" (returns
+    200 with a JSON model list). Cheap enough to run on every 2s poll.
+    """
+    import urllib.request
+    try:
+        req = urllib.request.Request(f"http://{host}:{port}/v1/models")
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return 200 <= r.status < 300
+    except Exception:
+        return False
+
+
 def clear_manifest_for_port(port: int) -> None:
     """Remove <logs>/runtime/<port>.json — called after a successful kill."""
     try:

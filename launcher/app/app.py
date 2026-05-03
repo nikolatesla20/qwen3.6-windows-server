@@ -41,6 +41,13 @@ class LauncherApp(App):
         self.bundle = cfgmod.load()
         self.running: dict = {}
         self.running_ids: set[str] = set()
+        # ready_ids ⊆ running_ids — the API responds to /v1/models. Anything
+        # in running_ids \ ready_ids is still booting (loading weights /
+        # compiling kernels). loading_ids holds optimistic state set the
+        # moment the user clicks Load, before the snapshot's manifest lands —
+        # cleared once the next poll picks the snapshot up in running_ids.
+        self.ready_ids: set[str] = set()
+        self.loading_ids: set[str] = set()
         self.linux_running: dict = {}
         self.linux_running_ids: set[str] = set()
         self._dashboard: Dashboard | None = None
@@ -76,13 +83,27 @@ class LauncherApp(App):
         ports = sorted({c.port for c in self.bundle.windows})
         running = runtime.detect_running(ports, self.bundle.windows)
         ids = set(running.keys())
-        self.call_from_thread(self._apply_running, running, ids)
+        ready: set[str] = set()
+        for cid, proc in running.items():
+            if runtime.probe_ready(proc.port):
+                ready.add(cid)
+        self.call_from_thread(self._apply_running, running, ids, ready)
 
-    def _apply_running(self, running, ids):
+    def _apply_running(self, running, ids, ready=None):
         self.running = running
         self.running_ids = ids
+        self.ready_ids = ready if ready is not None else set()
+        # Anything we optimistically marked as loading and which now shows up
+        # in running_ids has been picked up by the manifest poller — drop it
+        # from the optimistic set so we don't double-count.
+        self.loading_ids = {cid for cid in self.loading_ids if cid not in ids}
         if self._dashboard is not None:
             self._dashboard.update_running(ids)
+        # Push state into the active detail screen so its banner + buttons
+        # reflect the live snapshot status without forcing the user to leave
+        # and re-enter the screen.
+        if isinstance(self.screen, DetailScreen):
+            self.screen.refresh_state()
 
     def _maybe_refresh_linux(self) -> None:
         # Cheap throttle: only poll when the Linux tab is active OR a Linux detail is open

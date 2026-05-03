@@ -148,14 +148,14 @@ class DetailScreen(Screen):
     #actions Button#back-btn {
         background: #21262d;
     }
-    .running-banner {
-        background: #11202f;
-        border-left: thick #3fb950;
+    #status-banner {
         padding: 0 2;
-        color: #3fb950;
         text-style: bold;
         height: 1;
     }
+    #status-banner.idle    { background: #161b22; color: #8b949e; border-left: thick #30363d; }
+    #status-banner.loading { background: #2d220a; color: #d29922; border-left: thick #d29922; }
+    #status-banner.running { background: #11202f; color: #3fb950; border-left: thick #3fb950; }
     """
 
     BINDINGS = [
@@ -173,10 +173,12 @@ class DetailScreen(Screen):
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         cfg = self.cfg
-        is_running = cfg.id in self.app.running_ids
 
-        if is_running:
-            yield Static(f"  ● RUNNING — port {cfg.port}", classes="running-banner")
+        # Status banner is always mounted; refresh_state() flips its text +
+        # CSS class between idle / loading / running. Mounting it once (vs
+        # conditionally yielding) means refresh_state() can update it in
+        # place without reflow or remount churn.
+        yield Static("", id="status-banner", classes="idle")
 
         with Horizontal(id="cols"):
             with VerticalScroll(id="left"):
@@ -185,14 +187,74 @@ class DetailScreen(Screen):
                 yield Static(self._right_text())
 
         with Horizontal(id="actions"):
-            yield Button("Load (L)", id="load-btn", variant="success",
-                         disabled=(cfg.status == "blocked"))
-            yield Button("Unload (U)", id="unload-btn", variant="error",
-                         disabled=not is_running)
-            yield Button("Test (T)", id="test-btn", variant="primary",
-                         disabled=not is_running)
+            yield Button("Load (L)", id="load-btn", variant="success")
+            yield Button("Unload (U)", id="unload-btn", variant="error")
+            yield Button("Test (T)", id="test-btn", variant="primary")
             yield Button("Back (Esc)", id="back-btn")
         yield Footer()
+
+    def on_mount(self) -> None:
+        self.refresh_state()
+
+    def on_screen_resume(self) -> None:
+        self.refresh_state()
+
+    def _state(self) -> str:
+        """Current snapshot state from the app's perspective.
+
+        idle    — no manifest, no optimistic-load flag → Load enabled
+        loading — manifest exists but /v1/models hasn't answered yet, OR the
+                  user just clicked Load and the manifest hasn't appeared in
+                  the next poll → all action buttons disabled
+        running — manifest exists AND /v1/models returned 200 → Unload+Test
+        """
+        cid = self.cfg.id
+        app = self.app
+        if cid in app.ready_ids:
+            return "running"
+        if cid in app.running_ids or cid in app.loading_ids:
+            return "loading"
+        return "idle"
+
+    def refresh_state(self) -> None:
+        """Sync the status banner and button-disabled flags to the live state.
+
+        Called from on_mount, on_screen_resume, after Load/Unload clicks,
+        and from the app's poll worker every 2s. Idempotent.
+        """
+        try:
+            banner = self.query_one("#status-banner", Static)
+            load_btn = self.query_one("#load-btn", Button)
+            unload_btn = self.query_one("#unload-btn", Button)
+            test_btn = self.query_one("#test-btn", Button)
+        except Exception:
+            return  # widgets not mounted yet — on_mount will rerun
+
+        cfg = self.cfg
+        state = self._state()
+        blocked = (cfg.status == "blocked")
+
+        if state == "running":
+            banner.update(f"  ● RUNNING — port {cfg.port} (API ready)")
+            banner.set_classes("running")
+            # Already loaded → Load disabled, Unload+Test enabled.
+            load_btn.disabled = True
+            unload_btn.disabled = False
+            test_btn.disabled = False
+        elif state == "loading":
+            banner.update(f"  ◐ LOADING — vLLM is starting on port {cfg.port}, "
+                          f"this can take 60-120s (kernels + weights)...")
+            banner.set_classes("loading")
+            # In-flight → no actions allowed (Back still works via Esc).
+            load_btn.disabled = True
+            unload_btn.disabled = True
+            test_btn.disabled = True
+        else:
+            banner.update("  ○ Not running")
+            banner.set_classes("idle")
+            load_btn.disabled = blocked
+            unload_btn.disabled = True
+            test_btn.disabled = True
 
     def _meta_text(self) -> str:
         cfg = self.cfg
@@ -262,12 +324,21 @@ class DetailScreen(Screen):
         self.app.pop_screen()
 
     def action_load(self) -> None:
+        # Honor the same gating the buttons enforce — the keyboard shortcut
+        # must not bypass the disabled state (e.g. pressing 'l' while the
+        # snapshot is RUNNING should be a no-op, not a duplicate launch).
+        if self._state() != "idle" or self.cfg.status == "blocked":
+            return
         self._do_load()
 
     def action_unload(self) -> None:
+        if self._state() != "running":
+            return
         self._do_unload()
 
     def action_test(self) -> None:
+        if self._state() != "running":
+            return
         self._do_test()
 
     def on_button_pressed(self, ev: Button.Pressed) -> None:
@@ -288,6 +359,12 @@ class DetailScreen(Screen):
                 try:
                     runtime.start_config(cfg.bat, cfg.id)
                     self.app.notify(f"Launched {cfg.id} in Windows Terminal", timeout=4)
+                    # Optimistically flip the screen into LOADING immediately
+                    # so the user sees the state change without waiting for
+                    # the next 2s poll. The flag is dropped automatically the
+                    # moment the snapshot's manifest is detected.
+                    self.app.loading_ids.add(cfg.id)
+                    self.refresh_state()
                 except Exception as e:
                     self.app.notify(f"Launch failed: {e}", severity="error", timeout=6)
         self.app.push_screen(
