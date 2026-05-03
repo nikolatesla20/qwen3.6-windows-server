@@ -1,12 +1,14 @@
 # Using OpenAI Codex CLI with this server
 
-Codex CLI is finickier than Claude Code, Cline, or OpenCode against
-this server, for one specific reason: Codex talks to OpenAI's
-**Responses API** (`/v1/responses`) rather than the older Chat
-Completions API (`/v1/chat/completions`). The bundled vLLM wheel
-implements both endpoints, but the Responses API sends a `developer`
-role for system-tier instructions that the shipped Qwen3 chat
-template does not recognise.
+Codex CLI talks to OpenAI's **Responses API** (`/v1/responses`)
+rather than the older Chat Completions API (`/v1/chat/completions`).
+The bundled vLLM wheel implements both endpoints, and the shipped
+chat template aliases the `developer` role (which Responses API
+clients send for system-tier instructions) to `system` so this all
+works out of the box since v1.0.1.
+
+If you are on v1.0 or older you will hit the `Unexpected message role.`
+error described below. Upgrade to v1.0.1 or apply Option A by hand.
 
 If you do not specifically want Codex CLI, the easier path is one of
 these clients, all of which work with this server out of the box:
@@ -19,9 +21,10 @@ these clients, all of which work with this server out of the box:
 
 The rest of this page is for users who specifically want Codex CLI.
 
-## The error you will see
+## The error you will see (v1.0 and older only)
 
-When Codex sends its first inference request, vLLM logs:
+When Codex sends its first inference request on v1.0 or older, vLLM
+logs:
 
 ```
 ERROR ... [hf.py:502] An error occurred in `transformers` while
@@ -39,7 +42,9 @@ role.')` and vLLM returns 400.
 
 ## The fix
 
-Two options. Pick one.
+If you are on v1.0.1 or newer, there is no fix needed; the alias is
+shipped. If you are on v1.0 or older and cannot or will not upgrade,
+pick one of these.
 
 ### Option A: patch the chat template to accept `developer`
 
@@ -138,16 +143,33 @@ snapshot is loading a different template than the one you patched.
 Check the `--chat-template` flag in your snapshot file matches the
 file you edited.
 
-## Why I do not just ship the patch
+## Why the patch is now shipped by default
 
-I built and tested this server with Claude Code, not Codex. I have
-no Codex CLI test environment so I cannot promise a Codex-aware
-template stays correct across Codex updates. The Chat Completions
-clients (Claude Code, Cline, Cursor, OpenCode) all work today
-without the patch and that is the supported path.
+OpenAI's API itself bidirectionally aliases `system` and `developer`
+(it casts one to the other depending on which model you target), so
+the two roles are functionally equivalent at the model level. The
+documented harm in the wild flows entirely from *not* aliasing:
+silent message drops on MiniMax M2.5, literal `<|developer|>` token
+corruption on GLM-4.7, HTTP 500 crashes on Qwen3.5/3.6 with stock
+templates on llama.cpp.
 
-If the patch above works for you and you have time to send a PR
-that bakes it in plus a coherence-check pass, I will merge it.
+Multiple clients beyond Codex CLI hit this same wall:
+
+- **PI agent** (`badlogic/pi-mono`) sends `developer` by default for
+  reasoning-capable model configs. The `compat.supportsDeveloperRole:
+  false` flag in PI's config is a client-side workaround that does
+  the same role mapping on the way out.
+- **OpenCode** sends `system` by default, but routes through the
+  Responses API (with `developer`) when the provider is configured
+  via the official `@ai-sdk/openai` adapter rather than the generic
+  `@ai-sdk/openai-compatible` one.
+- Any future Responses-API client targeting o-series or GPT-5
+  semantics.
+
+Given that, baking the alias in trades nothing (no client sends
+`developer` content with semantics that need different treatment from
+`system`) for compatibility with several real-world clients out of
+the box.
 
 ## Related
 

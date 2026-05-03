@@ -118,6 +118,9 @@
 {%- endfor -%}
 {# -------- Render messages -------- #}
 {%- for message in messages -%}
+    {%- if message.role == "developer" -%}
+        {%- set message = dict(message, role="system") -%}
+    {%- endif -%}
     {%- set content = render_content(message.content, true)|trim -%}
     {%- if message.role == "system" -%}
         {%- if not loop.first -%}
