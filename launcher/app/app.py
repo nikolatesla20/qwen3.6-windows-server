@@ -70,6 +70,28 @@ class LauncherApp(App):
             self.refresh_linux_running()
             self.refresh_linux_alive()
 
+    def open_snapshot_manager(self) -> None:
+        """Push the CRUD editor; on dismiss, reload the bundle so the
+        dashboard reflects added/renamed/deleted snapshots."""
+        from .screens.snapshot_manage import SnapshotManageScreen
+        def _on_close(_changed: bool | None) -> None:
+            # Always reload — even on cancel the user may have hit Save before
+            # backing out. Cheap (a single yaml.safe_load).
+            self.bundle = cfgmod.load()
+            # Rebuild the dashboard instance so its cards-grid reflects the
+            # new windows.configs list. install_screen replaces the existing
+            # entry under the same name.
+            new_dash = Dashboard(self.bundle)
+            self._dashboard = new_dash
+            self.install_screen(new_dash, name="dashboard")
+            # If the dashboard is the current screen, switch to the freshly
+            # installed instance. uninstall_screen + push_screen avoids the
+            # "screen already on stack" error from a plain push_screen.
+            if isinstance(self.screen, Dashboard):
+                self.switch_screen("dashboard")
+            self.refresh_running()
+        self.push_screen(SnapshotManageScreen(self.bundle), _on_close)
+
     def open_detail(self, cfg_id: str) -> None:
         cfg = next((c for c in self.bundle.windows if c.id == cfg_id), None)
         if cfg is None:

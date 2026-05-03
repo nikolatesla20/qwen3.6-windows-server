@@ -28,6 +28,31 @@ class Dashboard(Screen):
         color: #8b949e;
         height: auto;
     }
+    #windows-toolbar {
+        height: 4;
+        padding: 0 2;
+        margin: 0 2 0 2;
+        background: #11161d;
+        border-top: solid #30363d;
+        border-bottom: solid #30363d;
+    }
+    #windows-toolbar Button {
+        margin: 0 1 0 0;
+        min-width: 22;
+        height: 3;
+        content-align: center middle;
+    }
+    #windows-toolbar Button#btn-edit-snapshots {
+        background: #11202f;
+        color: #58a6ff;
+        text-style: bold;
+    }
+    #windows-toolbar Static {
+        padding: 1 2;
+        height: 3;
+        color: #8b949e;
+        content-align: left middle;
+    }
     #linux-power-bar {
         height: 4;
         padding: 0 2;
@@ -85,6 +110,12 @@ class Dashboard(Screen):
         yield NavBar(active=self._active_tab)
         with ContentSwitcher(initial="pane-windows", id="tab-content"):
             with VerticalScroll(id="pane-windows"):
+                with Horizontal(id="windows-toolbar"):
+                    yield Button("Edit Snapshots", id="btn-edit-snapshots")
+                    yield Static(
+                        "Add / duplicate / edit / delete configs and "
+                        "their snapshot files",
+                    )
                 active = [c for c in self.bundle.windows if c.tier == "active"]
                 legacy = [c for c in self.bundle.windows if c.tier == "legacy"]
                 blocked = [c for c in self.bundle.windows if c.tier == "blocked"]
@@ -209,6 +240,8 @@ class Dashboard(Screen):
             ev.stop(); self.app.do_linux_wake()
         elif bid == "btn-refresh":
             ev.stop(); self.app.refresh_linux_running()
+        elif bid == "btn-edit-snapshots":
+            ev.stop(); self.app.open_snapshot_manager()
 
     def on_click(self, ev) -> None:
         w = ev.widget
