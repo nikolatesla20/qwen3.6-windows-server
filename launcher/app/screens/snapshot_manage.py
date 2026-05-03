@@ -17,24 +17,25 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import (
-    Button, Footer, Header, Input, Label, ListItem, ListView, Static, TextArea,
+    Button, Footer, Header, Input, Label, ListItem, ListView, Select,
+    Static, TextArea,
 )
 
 from .. import snapshot_io as sio
 from ..config import WinConfig, ConfigsBundle
 
 
-# Editable fields shown in the form. (input_id, label, default_str_for_None)
+# Editable fields shown in the form. (input_id, label, placeholder, default_str_for_None)
 _NUMERIC_FIELDS = [
-    ("port", "Port", ""),
-    ("tp", "TP (tensor-parallel)", "1"),
-    ("pp", "PP (pipeline-parallel)", "1"),
-    ("mem_util", "GPU mem-util (0.0 - 1.0)", "0.92"),
-    ("mtp_n", "MTP n  (blank = no spec-decode)", ""),
-    ("ctx", "Context window (tokens)", "32000"),
-    ("decode_tps", "Decode tok/s (measured)", ""),
-    ("prefill_tps_cold", "Prefill tok/s cold (measured)", ""),
-    ("power_cap_w", "Power cap W", ""),
+    ("port",             "Port",        "5001",            ""),
+    ("tp",               "TP",          "tensor-parallel", "1"),
+    ("pp",               "PP",          "pipeline-parallel", "1"),
+    ("mem_util",         "GPU mem-util","0.0 - 1.0",       "0.92"),
+    ("mtp_n",            "MTP n",       "blank = no spec-decode", ""),
+    ("ctx",              "Context",     "tokens",          "32000"),
+    ("decode_tps",       "Decode tok/s","measured",        ""),
+    ("prefill_tps_cold", "Prefill tok/s cold", "measured", ""),
+    ("power_cap_w",      "Power cap",   "watts",           ""),
 ]
 
 _TIERS = ("active", "legacy", "blocked")
@@ -48,23 +49,16 @@ class SnapshotManageScreen(Screen[bool]):
     DEFAULT_CSS = """
     SnapshotManageScreen { background: #0d1117; color: #e6edf3; }
 
-    #sm-title {
-        padding: 0 2;
-        height: 1;
-        color: #58a6ff;
-        text-style: bold;
-    }
-
     #sm-body { height: 1fr; }
     #sm-left { width: 40; min-width: 32; max-width: 48;
                background: #11161d; border-right: solid #30363d; }
-    #sm-right { width: 1fr; padding: 0 2; layout: vertical; }
-    #sm-form-scroll { height: 1fr; }
+    #sm-right { width: 1fr; padding: 0 2 0 2; layout: vertical; }
+    #sm-form-scroll { height: 1fr; padding: 1 1 0 0; }
 
     .sm-section-title {
         color: #58a6ff;
         text-style: bold;
-        padding: 1 1 0 1;
+        padding: 1 1 1 1;
         height: auto;
     }
 
@@ -74,7 +68,7 @@ class SnapshotManageScreen(Screen[bool]):
         scrollbar-size: 0 0;
     }
     #sm-list > ListItem {
-        padding: 0 1;
+        padding: 1 1 0 1;
         background: #11161d;
     }
     #sm-list > ListItem.-highlight {
@@ -98,10 +92,10 @@ class SnapshotManageScreen(Screen[bool]):
 
     .sm-row {
         height: 3;
-        margin-bottom: 0;
+        margin-bottom: 1;
     }
     .sm-row Label {
-        width: 28;
+        width: 22;
         padding: 1 1 0 0;
         color: #8b949e;
     }
@@ -109,38 +103,20 @@ class SnapshotManageScreen(Screen[bool]):
         width: 1fr;
         height: 3;
     }
-
-    .sm-pill-row { height: 3; margin-bottom: 0; }
-    .sm-pill-row > Label {
-        width: 28; padding: 1 1 0 0; color: #8b949e; height: 3;
-    }
-    .sm-pill {
-        width: auto;
-        padding: 0 2;
-        margin: 0 1 0 0;
+    .sm-row Select {
+        width: 1fr;
         height: 3;
-        background: #161b22;
-        border: tall #30363d;
-        color: #8b949e;
-        content-align: center middle;
     }
-    .sm-pill.-on {
-        background: #11202f;
-        color: #58a6ff;
-        border: tall #58a6ff;
-        text-style: bold;
-    }
-    .sm-pill-spacer { width: 1fr; height: 3; }
 
-    #sm-notes-row { height: 8; margin-top: 0; }
-    #sm-notes-row Label { width: 28; padding: 1 1 0 0; color: #8b949e; }
+    #sm-notes-row { height: 8; margin-top: 0; margin-bottom: 1; }
+    #sm-notes-row Label { width: 22; padding: 1 1 0 0; color: #8b949e; }
     #sm-notes { height: 8; background: #161b22; border: solid #30363d; }
 
     #sm-form-buttons {
         height: 3;
         margin-top: 1;
-        padding: 0 0;
-        border-top: solid #30363d;
+        padding: 0;
+        background: #0d1117;
     }
     #sm-form-buttons Button {
         margin: 0 1 0 0;
@@ -152,11 +128,6 @@ class SnapshotManageScreen(Screen[bool]):
     Button.sm-btn-danger   { background: #2d0a0f; color: #f85149; }
 
     #sm-status {
-        height: 1;
-        padding: 0 2;
-        color: #8b949e;
-    }
-    #sm-help {
         height: 1;
         padding: 0 2;
         color: #8b949e;
@@ -184,7 +155,6 @@ class SnapshotManageScreen(Screen[bool]):
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
-        yield Static("Edit Snapshots — full CRUD for windows.configs", id="sm-title")
         with Horizontal(id="sm-body"):
             with Vertical(id="sm-left"):
                 yield Static("Snapshots", classes="sm-section-title")
@@ -197,38 +167,42 @@ class SnapshotManageScreen(Screen[bool]):
                 yield Static("Edit Snapshot", classes="sm-section-title")
                 with VerticalScroll(id="sm-form-scroll"):
                     with Horizontal(classes="sm-row"):
-                        yield Label("ID (snapshot key)")
-                        yield Input(placeholder="e.g. my_64k", id="sm-in-id")
+                        yield Label("ID")
+                        yield Input(placeholder="snapshot key — e.g. my_64k",
+                                    id="sm-in-id")
                     with Horizontal(classes="sm-row"):
-                        yield Label("Tagline (one line)")
-                        yield Input(placeholder="Short description",
+                        yield Label("Tagline")
+                        yield Input(placeholder="one-line description",
                                     id="sm-in-tagline")
 
-                    with Horizontal(classes="sm-pill-row", id="sm-row-tier"):
+                    with Horizontal(classes="sm-row"):
                         yield Label("Tier")
-                        for t in _TIERS:
-                            yield Static(t, id=f"sm-tier-{t}", classes="sm-pill")
-                        yield Static("", classes="sm-pill-spacer")
-                    with Horizontal(classes="sm-pill-row", id="sm-row-status"):
+                        yield Select(
+                            [(t, t) for t in _TIERS],
+                            id="sm-sel-tier", value="active", allow_blank=False,
+                        )
+                    with Horizontal(classes="sm-row"):
                         yield Label("Status")
-                        for s in _STATUSES:
-                            yield Static(s, id=f"sm-status-{s}", classes="sm-pill")
-                        yield Static("", classes="sm-pill-spacer")
-                    with Horizontal(classes="sm-pill-row", id="sm-row-gpu"):
+                        yield Select(
+                            [(s, s) for s in _STATUSES],
+                            id="sm-sel-status", value="recommended",
+                            allow_blank=False,
+                        )
+                    with Horizontal(classes="sm-row"):
                         yield Label("GPU")
-                        for g in _GPUS:
-                            yield Static(g, id=f"sm-gpu-{g.replace('+','p')}",
-                                         classes="sm-pill")
-                        yield Static("", classes="sm-pill-spacer")
+                        yield Select(
+                            [(g, g) for g in _GPUS],
+                            id="sm-sel-gpu", value="GPU1", allow_blank=False,
+                        )
 
-                    for fid, lab, _ in _NUMERIC_FIELDS:
+                    for fid, lab, placeholder, _ in _NUMERIC_FIELDS:
                         with Horizontal(classes="sm-row"):
                             yield Label(lab)
-                            yield Input(placeholder="", id=f"sm-in-{fid}",
-                                        type="text")
+                            yield Input(placeholder=placeholder,
+                                        id=f"sm-in-{fid}", type="text")
 
                     with Horizontal(id="sm-notes-row"):
-                        yield Label("Notes (free text)")
+                        yield Label("Notes")
                         yield TextArea("", id="sm-notes")
 
                 with Horizontal(id="sm-form-buttons"):
@@ -238,11 +212,6 @@ class SnapshotManageScreen(Screen[bool]):
                     yield Button("Back [Esc]", id="sm-btn-back")
 
         yield Static("", id="sm-status")
-        yield Static(
-            "n/dup/del list ops · Ctrl+S save · click tier/status/gpu pills "
-            "· Esc back",
-            id="sm-help",
-        )
         yield Footer()
 
     def on_mount(self) -> None:
@@ -284,23 +253,19 @@ class SnapshotManageScreen(Screen[bool]):
         c = self._find(cid)
         if c is None:
             self._set_form_strings({"id": "", "tagline": ""})
-            for fid, _, default in _NUMERIC_FIELDS:
+            for fid, _, _, _ in _NUMERIC_FIELDS:
                 self.query_one(f"#sm-in-{fid}", Input).value = ""
             self.query_one("#sm-notes", TextArea).text = ""
             self._form_tier = "active"
             self._form_status = "experimental"
             self._form_gpu = "GPU1"
-            self._refresh_pill_classes()
+            self._sync_selects_from_state()
             return
 
         self._set_form_strings({
             "id": c.id,
             "tagline": c.tagline,
         })
-        # numeric fields — convert None to ""
-        py_consts = sio.read_py_constants(Path(c.py)) if c.py else {}
-        # Prefer YAML values, fall back to .py-file values for fields YAML
-        # doesn't carry (e.g. MAX_NUM_BATCHED_TOKENS).
         numeric = {
             "port": c.port,
             "tp": c.tp,
@@ -312,7 +277,7 @@ class SnapshotManageScreen(Screen[bool]):
             "prefill_tps_cold": c.prefill_tps_cold,
             "power_cap_w": c.power_cap_w,
         }
-        for fid, _, _ in _NUMERIC_FIELDS:
+        for fid, _, _, _ in _NUMERIC_FIELDS:
             v = numeric.get(fid)
             self.query_one(f"#sm-in-{fid}", Input).value = "" if v is None else str(v)
 
@@ -320,7 +285,7 @@ class SnapshotManageScreen(Screen[bool]):
         self._form_tier = c.tier or "active"
         self._form_status = c.status or "experimental"
         self._form_gpu = c.gpu or "GPU1"
-        self._refresh_pill_classes()
+        self._sync_selects_from_state()
 
     def _set_form_strings(self, values: dict[str, str]) -> None:
         for k, v in values.items():
@@ -331,16 +296,14 @@ class SnapshotManageScreen(Screen[bool]):
             inp.value = v
             inp.cursor_position = 0
 
-    def _refresh_pill_classes(self) -> None:
-        for t in _TIERS:
-            w = self.query_one(f"#sm-tier-{t}", Static)
-            w.set_classes(f"sm-pill{' -on' if t == self._form_tier else ''}")
-        for s in _STATUSES:
-            w = self.query_one(f"#sm-status-{s}", Static)
-            w.set_classes(f"sm-pill{' -on' if s == self._form_status else ''}")
-        for g in _GPUS:
-            w = self.query_one(f"#sm-gpu-{g.replace('+','p')}", Static)
-            w.set_classes(f"sm-pill{' -on' if g == self._form_gpu else ''}")
+    def _sync_selects_from_state(self) -> None:
+        """Push self._form_tier/status/gpu into the Select widgets."""
+        try:
+            self.query_one("#sm-sel-tier", Select).value = self._form_tier
+            self.query_one("#sm-sel-status", Select).value = self._form_status
+            self.query_one("#sm-sel-gpu", Select).value = self._form_gpu
+        except Exception:
+            pass
 
     def _set_status(self, msg: str, kind: str = "info") -> None:
         bar = self.query_one("#sm-status", Static)
@@ -361,7 +324,7 @@ class SnapshotManageScreen(Screen[bool]):
             "gpu": self._form_gpu,
             "notes": self.query_one("#sm-notes", TextArea).text,
         }
-        for fid, _, _ in _NUMERIC_FIELDS:
+        for fid, _, _, _ in _NUMERIC_FIELDS:
             out[fid] = _val(fid)
         return out
 
@@ -384,20 +347,17 @@ class SnapshotManageScreen(Screen[bool]):
         if cid and cid != self._current_id:
             self._load_into_form(cid)
 
-    def on_click(self, ev) -> None:
-        w = ev.widget
-        # Tier / status / gpu pill click selection
-        if isinstance(w, Static):
-            wid = w.id or ""
-            if wid.startswith("sm-tier-"):
-                self._form_tier = wid[len("sm-tier-"):]
-                self._refresh_pill_classes(); ev.stop()
-            elif wid.startswith("sm-status-"):
-                self._form_status = wid[len("sm-status-"):]
-                self._refresh_pill_classes(); ev.stop()
-            elif wid.startswith("sm-gpu-"):
-                self._form_gpu = wid[len("sm-gpu-"):].replace("p", "+")
-                self._refresh_pill_classes(); ev.stop()
+    def on_select_changed(self, ev: Select.Changed) -> None:
+        sid = ev.select.id or ""
+        val = ev.value
+        if val is Select.BLANK:
+            return
+        if sid == "sm-sel-tier":
+            self._form_tier = str(val)
+        elif sid == "sm-sel-status":
+            self._form_status = str(val)
+        elif sid == "sm-sel-gpu":
+            self._form_gpu = str(val)
 
     def on_button_pressed(self, ev: Button.Pressed) -> None:
         bid = ev.button.id or ""
@@ -420,13 +380,13 @@ class SnapshotManageScreen(Screen[bool]):
     def action_new(self) -> None:
         self._current_id = None
         self._set_form_strings({"id": "", "tagline": ""})
-        for fid, _, default in _NUMERIC_FIELDS:
+        for fid, _, _, default in _NUMERIC_FIELDS:
             self.query_one(f"#sm-in-{fid}", Input).value = default
         self.query_one("#sm-notes", TextArea).text = ""
         self._form_tier = "active"
         self._form_status = "experimental"
         self._form_gpu = "GPU1"
-        self._refresh_pill_classes()
+        self._sync_selects_from_state()
         self.query_one("#sm-in-id", Input).focus()
         self._set_status(
             "New snapshot — fill in ID and fields, Ctrl+S to save. "
@@ -450,14 +410,14 @@ class SnapshotManageScreen(Screen[bool]):
         # Tagline
         self.query_one("#sm-in-tagline", Input).value = c.tagline + " (copy)"
         # numerics from the source
-        for fid, _, _ in _NUMERIC_FIELDS:
+        for fid, _, _, _ in _NUMERIC_FIELDS:
             v = getattr(c, fid, None)
             self.query_one(f"#sm-in-{fid}", Input).value = "" if v is None else str(v)
         self.query_one("#sm-notes", TextArea).text = c.notes or ""
         self._form_tier = c.tier
         self._form_status = c.status
         self._form_gpu = c.gpu
-        self._refresh_pill_classes()
+        self._sync_selects_from_state()
         self.query_one("#sm-in-id", Input).focus()
         self._set_status(
             f"Duplicated '{c.id}' -> '{suggest}'. Edit fields, Ctrl+S to save "
