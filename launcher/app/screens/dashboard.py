@@ -14,12 +14,13 @@ class Dashboard(Screen):
     Dashboard { background: #0d1117; color: #e6edf3; }
     .cards-grid {
         grid-size: 3;
-        grid-gutter: 1 1;
-        padding: 1 2 1 2;
+        grid-gutter: 0 1;
+        padding: 0 2 0 2;
         height: auto;
     }
     .legacy-section-title {
-        padding: 1 2;
+        padding: 0 2;
+        height: 1;
         color: #d29922;
         text-style: bold;
     }

@@ -38,6 +38,9 @@ TABS: tuple[tuple[str, str], ...] = (
 class NavBar(Horizontal):
     """Top-of-screen tab bar. Construct with ``NavBar(active="windows")``."""
 
+    # When only one tab is configured (Linux disabled, the public-release
+    # default), there's nothing to switch between — collapse the bar to zero
+    # height. The button code stays so VLLM_WINDOWS_ENABLE_LINUX=1 still works.
     DEFAULT_CSS = """
     NavBar {
         height: 3;
@@ -45,6 +48,7 @@ class NavBar(Horizontal):
         padding: 0;
         background: #0d1117;
     }
+    NavBar.-single-tab { height: 0; display: none; }
     NavBar Button {
         margin: 0;
         height: 3;
@@ -139,6 +143,8 @@ class NavBar(Horizontal):
     def __init__(self, *, active: str = "windows", id: str | None = "nav-bar") -> None:
         super().__init__(id=id)
         self._active = active
+        if len(TABS) <= 1:
+            self.add_class("-single-tab")
 
     def compose(self) -> ComposeResult:
         for tab_id, label in TABS:
