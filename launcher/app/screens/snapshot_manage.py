@@ -21,6 +21,7 @@ from textual.widgets import (
     Static, TextArea,
 )
 
+from ..windows_input import WindowsInput
 from .. import snapshot_io as sio
 from ..config import WinConfig, ConfigsBundle
 
@@ -170,11 +171,11 @@ class SnapshotManageScreen(Screen[bool]):
                 with VerticalScroll(id="sm-form-scroll"):
                     with Horizontal(classes="sm-row"):
                         yield Label("ID")
-                        yield Input(placeholder="snapshot key — e.g. my_64k",
+                        yield WindowsInput(placeholder="snapshot key — e.g. my_64k",
                                     id="sm-in-id")
                     with Horizontal(classes="sm-row"):
                         yield Label("Tagline")
-                        yield Input(placeholder="one-line description",
+                        yield WindowsInput(placeholder="one-line description",
                                     id="sm-in-tagline")
 
                     with Horizontal(classes="sm-row"):
@@ -200,8 +201,8 @@ class SnapshotManageScreen(Screen[bool]):
                     for fid, lab, placeholder, _ in _NUMERIC_FIELDS:
                         with Horizontal(classes="sm-row"):
                             yield Label(lab)
-                            yield Input(placeholder=placeholder,
-                                        id=f"sm-in-{fid}", type="text")
+                            yield WindowsInput(placeholder=placeholder,
+                                               id=f"sm-in-{fid}", type="text")
 
                     with Horizontal(id="sm-notes-row"):
                         yield Label("Notes")
