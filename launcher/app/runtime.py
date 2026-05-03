@@ -105,10 +105,18 @@ def _read_manifests() -> list[dict]:
     return out
 
 
-def _port_listening(port: int, host: str = "127.0.0.1") -> bool:
-    """Locale-free port check — connect attempt, no netstat parsing."""
+def _port_listening(port: int, host: str = "127.0.0.1",
+                    timeout: float = 1.5) -> bool:
+    """Locale-free port check — connect attempt, no netstat parsing.
+
+    Default timeout is generous (1.5s) because vLLM holds the bound port
+    while compiling kernels at boot — listen() has been called but the
+    accept() loop isn't running yet, so a stingy timeout reports the
+    port as 'not listening' even though it's clearly owned. We don't
+    need a fast probe here — `detect_running` runs at 2s intervals.
+    """
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.settimeout(0.3)
+        s.settimeout(timeout)
         try:
             s.connect((host, port))
             return True
@@ -156,25 +164,29 @@ def detect_running(ports: list[int], configs) -> dict[str, RunningProc]:
     matched_ports: set[int] = set()
 
     # ------- Primary: manifest-driven --------
+    # Liveness rule: a manifest is considered LIVE if
+    #   port-listening  OR  wrapper-pid-alive
+    # We GC only when BOTH are false. The "port listening" check alone is
+    # not authoritative during the ~60-90s vLLM compile window, where the
+    # port has been listen()'d but accept() is starved by kernel-compile
+    # work and a quick connect() probe times out. Killing the manifest in
+    # that window flips the dashboard back to the legacy port-only
+    # fallback and lights the wrong card. Conversely, the wrapper python
+    # is reliably alive throughout the snapshot's lifetime — it's the
+    # process holding the vllm subprocess open and tee'ing its log.
     by_bat = {_bat_basename(c): c for c in configs}
     for mf in _read_manifests():
         port = int(mf.get("port") or 0)
         if not port:
             continue
-        # Verify port is listening; if not, manifest is stale → GC.
-        if not _port_listening(port):
+        wrapper_pid = int(mf.get("wrapper_pid") or 0)
+        port_up = _port_listening(port)
+        wrapper_up = bool(wrapper_pid) and _pid_alive(wrapper_pid)
+        if not port_up and not wrapper_up:
+            # Both signals say the snapshot is gone — safe to GC.
             try: Path(mf["__path__"]).unlink()
             except (OSError, KeyError): pass
             continue
-        # Optional: verify wrapper pid alive. If dead but port still bound,
-        # something else owns the port — keep manifest, trust port match.
-        wrapper_pid = int(mf.get("wrapper_pid") or 0)
-        if wrapper_pid and not _pid_alive(wrapper_pid):
-            # Port still listening means another process inherited it, or
-            # the wrapper died but the API server child survived. The
-            # manifest's snapshot_id is still our best identity guess —
-            # don't GC, but don't trust pid for kills.
-            pass
 
         snap_bat = (mf.get("snapshot_bat") or "").lower()
         cfg = by_bat.get(snap_bat)
