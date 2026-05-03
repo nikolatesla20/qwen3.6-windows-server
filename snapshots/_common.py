@@ -234,6 +234,50 @@ def msvc_env() -> dict:
             env[k] = v
     return env
 
+def _ensure_cudart_alias(cuda_path: str | Path) -> None:
+    """Create cudart64_120.dll as a copy of cudart64_12.dll if missing.
+
+    flashinfer's ``jit/__init__.py`` does an absolute-path
+    ``ctypes.CDLL("<CUDA_PATH>/bin/cudart64_120.dll")`` at import time.
+    NVIDIA's CUDA 12.x toolkit ships the file as ``cudart64_12.dll`` (the
+    naming changed between 11.x's ``cudart64_110.dll`` and 12.x's
+    single-major form), so flashinfer crashes EngineCore on every modern
+    install with:
+
+        FileNotFoundError: Could not find module
+        '...\\CUDA\\v12.6\\bin\\cudart64_120.dll'
+
+    Best-effort fix: copy the real DLL alongside under the expected name.
+    The CUDA install dir is usually under Program Files (admin write), so
+    the copy can fail with PermissionError. In that case we print a
+    one-line copy command the user can run from an admin prompt — same
+    workaround as before, just surfaced at the right moment.
+    """
+    try:
+        bin_dir = Path(cuda_path) / "bin"
+        target = bin_dir / "cudart64_120.dll"
+        if target.exists():
+            return
+        source = bin_dir / "cudart64_12.dll"
+        if not source.exists():
+            return
+        try:
+            shutil.copyfile(source, target)
+            print(f"[info] aliased {source.name} -> {target.name} "
+                  "(flashinfer hardcodes the old name)", flush=True)
+        except OSError as e:
+            print(
+                f"[warn] flashinfer expects {target.name} but only "
+                f"{source.name} is present, and the alias copy failed "
+                f"({e.__class__.__name__}). Run this once from an "
+                f"elevated cmd to fix permanently:\n"
+                f'       copy "{source}" "{target}"',
+                file=sys.stderr, flush=True,
+            )
+    except Exception:
+        pass
+
+
 def cuda_env() -> dict:
     """Set CUDA_LIB_PATH so flashinfer's import-time check passes.
 
@@ -261,10 +305,12 @@ def cuda_env() -> dict:
     later if the user ever needs them.
     """
     if os.environ.get("CUDA_LIB_PATH"):
+        _ensure_cudart_alias(os.environ["CUDA_LIB_PATH"])
         return {}
     for var in ("CUDA_PATH", "CUDA_HOME"):
         val = os.environ.get(var)
         if val and Path(val).is_dir():
+            _ensure_cudart_alias(val)
             return {"CUDA_LIB_PATH": val}
     nvidia_root = Path(r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA")
     if nvidia_root.is_dir():
@@ -274,6 +320,7 @@ def cuda_env() -> dict:
             reverse=True,
         )
         if versions:
+            _ensure_cudart_alias(versions[0])
             return {"CUDA_LIB_PATH": str(versions[0])}
     print(
         "[warn] No CUDA Toolkit found (checked CUDA_PATH, CUDA_HOME, "
