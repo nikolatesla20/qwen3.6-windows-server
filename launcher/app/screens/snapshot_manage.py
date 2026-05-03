@@ -141,12 +141,14 @@ class SnapshotManageScreen(Screen[bool]):
         Binding("escape", "go_back", "Back"),
     ]
 
-    def __init__(self, bundle: ConfigsBundle) -> None:
+    def __init__(self, bundle: ConfigsBundle,
+                 select_id: str | None = None) -> None:
         super().__init__()
         # Working copy — edits land in this list, written to disk only on Save.
         self.bundle = bundle
         self._snapshot_bundle = copy.deepcopy(bundle.windows)
         self._current_id: str | None = None  # None == editing an unsaved new entry
+        self._initial_select = select_id
         self._form_tier: str = "active"
         self._form_status: str = "recommended"
         self._form_gpu: str = "GPU1"
@@ -215,8 +217,13 @@ class SnapshotManageScreen(Screen[bool]):
         yield Footer()
 
     def on_mount(self) -> None:
-        self._refresh_list(select_id=self._snapshot_bundle[0].id
-                           if self._snapshot_bundle else None)
+        # Honor the select_id passed in (from DetailScreen → Edit) when it
+        # actually exists in the bundle; otherwise fall back to the first row.
+        existing_ids = {c.id for c in self._snapshot_bundle}
+        target = (self._initial_select if self._initial_select in existing_ids
+                  else (self._snapshot_bundle[0].id
+                        if self._snapshot_bundle else None))
+        self._refresh_list(select_id=target)
         self.query_one("#sm-list", ListView).focus()
 
     # ── List helpers ─────────────────────────────────────────────────────

@@ -70,9 +70,14 @@ class LauncherApp(App):
             self.refresh_linux_running()
             self.refresh_linux_alive()
 
-    def open_snapshot_manager(self) -> None:
+    def open_snapshot_manager(self, select_id: str | None = None) -> None:
         """Push the CRUD editor; on dismiss, reload the bundle so the
-        dashboard reflects added/renamed/deleted snapshots."""
+        dashboard reflects added/renamed/deleted snapshots.
+
+        ``select_id`` pre-selects a row in the manager's left list — used
+        by the Detail screen's Edit button so the user lands on the
+        snapshot they were viewing.
+        """
         from .screens.snapshot_manage import SnapshotManageScreen
         def _on_close(_changed: bool | None) -> None:
             # Always reload — even on cancel the user may have hit Save before
@@ -90,7 +95,10 @@ class LauncherApp(App):
             if isinstance(self.screen, Dashboard):
                 self.switch_screen(new_dash)
             self.refresh_running()
-        self.push_screen(SnapshotManageScreen(self.bundle), _on_close)
+        self.push_screen(
+            SnapshotManageScreen(self.bundle, select_id=select_id),
+            _on_close,
+        )
 
     def open_detail(self, cfg_id: str) -> None:
         cfg = next((c for c in self.bundle.windows if c.id == cfg_id), None)

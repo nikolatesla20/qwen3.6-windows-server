@@ -173,6 +173,7 @@ class DetailScreen(Screen):
         ("l", "load", "Load"),
         ("u", "unload", "Unload"),
         ("t", "test", "Test"),
+        ("e", "edit", "Edit"),
     ]
 
     def __init__(self, cfg: WinConfig, bundle, **kw):
@@ -200,6 +201,7 @@ class DetailScreen(Screen):
             yield Button("Load (L)", id="load-btn", variant="success")
             yield Button("Unload (U)", id="unload-btn", variant="error")
             yield Button("Test (T)", id="test-btn", variant="primary")
+            yield Button("Edit (E)", id="edit-btn")
             yield Button("Back (Esc)", id="back-btn")
         yield Footer()
 
@@ -360,6 +362,14 @@ class DetailScreen(Screen):
             return
         self._do_test()
 
+    def action_edit(self) -> None:
+        # Pop back to the dashboard first so the manager's on-dismiss
+        # dashboard rebuild lands on a clean stack — otherwise we'd return
+        # from the manager into a stale DetailScreen referencing a possibly
+        # renamed/deleted cfg.
+        self.app.pop_screen()
+        self.app.open_snapshot_manager(select_id=self.cfg.id)
+
     def on_button_pressed(self, ev: Button.Pressed) -> None:
         if ev.button.id == "back-btn":
             self.action_back()
@@ -369,6 +379,8 @@ class DetailScreen(Screen):
             self._do_unload()
         elif ev.button.id == "test-btn":
             self._do_test()
+        elif ev.button.id == "edit-btn":
+            self.action_edit()
 
     def _do_load(self) -> None:
         cfg = self.cfg
