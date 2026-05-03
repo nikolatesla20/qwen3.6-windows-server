@@ -35,7 +35,7 @@ class ConfigCard(Static):
         padding: 0 1;
         height: 11;
         width: 1fr;
-        margin: 0 1 1 0;
+        margin: 0;
     }
     ConfigCard:focus {
         border: solid #58a6ff;

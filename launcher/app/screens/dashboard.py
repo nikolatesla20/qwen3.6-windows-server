@@ -19,8 +19,8 @@ class Dashboard(Screen):
         height: auto;
     }
     .legacy-section-title {
-        padding: 0 2;
-        height: 1;
+        padding: 1 2 0 2;
+        height: 2;
         color: #d29922;
         text-style: bold;
     }
