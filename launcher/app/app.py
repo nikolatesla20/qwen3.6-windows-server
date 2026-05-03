@@ -81,14 +81,14 @@ class LauncherApp(App):
             # Rebuild the dashboard instance so its cards-grid reflects the
             # new windows.configs list. install_screen replaces the existing
             # entry under the same name.
+            # Replace the active dashboard with a fresh instance so the
+            # cards-grid reflects the new windows.configs list. switch_screen
+            # accepts a Screen instance and avoids the install/uninstall dance
+            # (which fails when the named screen is currently active).
             new_dash = Dashboard(self.bundle)
             self._dashboard = new_dash
-            self.install_screen(new_dash, name="dashboard")
-            # If the dashboard is the current screen, switch to the freshly
-            # installed instance. uninstall_screen + push_screen avoids the
-            # "screen already on stack" error from a plain push_screen.
             if isinstance(self.screen, Dashboard):
-                self.switch_screen("dashboard")
+                self.switch_screen(new_dash)
             self.refresh_running()
         self.push_screen(SnapshotManageScreen(self.bundle), _on_close)
 
