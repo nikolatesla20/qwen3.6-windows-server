@@ -57,7 +57,13 @@ class LauncherApp(App):
         self.install_screen(self._dashboard, name="dashboard")
         self.install_screen(HelpScreen(self.bundle), name="help")
         self.push_screen("dashboard")
+        # Manifest detection runs every 2s — cheap, all file-based, no
+        # network. The /v1/models readiness probe is much more expensive
+        # (vLLM logs every request) so it lives on a separate gate that
+        # only fires while a DetailScreen is open and at most every 5s.
+        self._last_ready_probe_t: float = 0.0
         self.set_interval(2.0, self.refresh_running)
+        self.set_interval(1.0, self._maybe_probe_ready)
         self.refresh_running()
         if _ENABLE_LINUX:
             self.set_interval(5.0, self._maybe_refresh_linux)
@@ -83,16 +89,14 @@ class LauncherApp(App):
         ports = sorted({c.port for c in self.bundle.windows})
         running = runtime.detect_running(ports, self.bundle.windows)
         ids = set(running.keys())
-        ready: set[str] = set()
-        for cid, proc in running.items():
-            if runtime.probe_ready(proc.port):
-                ready.add(cid)
-        self.call_from_thread(self._apply_running, running, ids, ready)
+        self.call_from_thread(self._apply_running, running, ids)
 
-    def _apply_running(self, running, ids, ready=None):
+    def _apply_running(self, running, ids):
         self.running = running
         self.running_ids = ids
-        self.ready_ids = ready if ready is not None else set()
+        # ready_ids is a subset of running_ids — drop entries whose snapshot
+        # is no longer running. New entries are added by _probe_ready_worker.
+        self.ready_ids = {cid for cid in self.ready_ids if cid in ids}
         # Anything we optimistically marked as loading and which now shows up
         # in running_ids has been picked up by the manifest poller — drop it
         # from the optimistic set so we don't double-count.
@@ -104,6 +108,57 @@ class LauncherApp(App):
         # and re-enter the screen.
         if isinstance(self.screen, DetailScreen):
             self.screen.refresh_state()
+
+    def _maybe_probe_ready(self) -> None:
+        """Gate the /v1/models probe to keep vLLM access logs clean.
+
+        Conditions to fire:
+          1. A DetailScreen is the active screen (nobody else needs ready_ids).
+          2. That screen's cfg is running but not yet known to be ready —
+             once we've confirmed ready, we stop probing entirely until the
+             snapshot leaves running_ids (e.g. user clicks Unload).
+          3. At least 5 seconds have elapsed since the last probe.
+        """
+        scr = self.screen
+        if not isinstance(scr, DetailScreen):
+            return
+        cid = scr.cfg.id
+        if cid not in self.running_ids or cid in self.ready_ids:
+            return
+        import time as _time
+        now = _time.monotonic()
+        if now - self._last_ready_probe_t < 5.0:
+            return
+        self._last_ready_probe_t = now
+        self.run_worker(
+            lambda: self._probe_ready_worker(cid),
+            thread=True, exclusive=False,
+        )
+
+    def _probe_ready_worker(self, cid: str) -> None:
+        proc = self.running.get(cid)
+        if not proc:
+            return
+        if runtime.probe_ready(proc.port):
+            self.call_from_thread(self._mark_ready, cid)
+
+    def _mark_ready(self, cid: str) -> None:
+        if cid in self.running_ids and cid not in self.ready_ids:
+            self.ready_ids = self.ready_ids | {cid}
+            if isinstance(self.screen, DetailScreen):
+                self.screen.refresh_state()
+
+    def probe_ready_now(self, cid: str) -> None:
+        """Trigger an immediate probe — used when DetailScreen first mounts so
+        an already-loaded snapshot doesn't briefly render as LOADING."""
+        if cid not in self.running_ids or cid in self.ready_ids:
+            return
+        import time as _time
+        self._last_ready_probe_t = _time.monotonic()
+        self.run_worker(
+            lambda: self._probe_ready_worker(cid),
+            thread=True, exclusive=False,
+        )
 
     def _maybe_refresh_linux(self) -> None:
         # Cheap throttle: only poll when the Linux tab is active OR a Linux detail is open

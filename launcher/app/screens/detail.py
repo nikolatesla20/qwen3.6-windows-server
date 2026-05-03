@@ -194,9 +194,14 @@ class DetailScreen(Screen):
         yield Footer()
 
     def on_mount(self) -> None:
+        # Kick a one-shot readiness probe so an already-loaded snapshot
+        # renders as RUNNING immediately rather than briefly flashing
+        # LOADING for up to 5s waiting for the throttled gate to fire.
+        self.app.probe_ready_now(self.cfg.id)
         self.refresh_state()
 
     def on_screen_resume(self) -> None:
+        self.app.probe_ready_now(self.cfg.id)
         self.refresh_state()
 
     def _state(self) -> str:
