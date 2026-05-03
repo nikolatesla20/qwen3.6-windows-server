@@ -11,6 +11,7 @@ snapshot. Resolution order:
 """
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -70,10 +71,67 @@ MODEL_PATH = os.environ.get(
 )
 
 
+# vswhere.exe lives under the VS Installer dir, NOT on PATH by default.
+# vcvars64.bat shells out to vswhere.exe with no path qualifier, so without
+# this prefix the snapshot logs start with a scary
+# `'vswhere.exe' is not recognized as an internal or external command` line
+# even though vcvars then falls through to a working VS install.
+VS_INSTALLER_DIR = r"C:\Program Files (x86)\Microsoft Visual Studio\Installer"
+
+
+def _vswhere_vcvars() -> str | None:
+    """Ask vswhere.exe for the latest VS install with the VC++ x64 toolset.
+
+    Works for VS 2022 (17.x), VS 2026 (18.x), BuildTools, and any future
+    layout Microsoft ships, since the path comes from the installer
+    catalog rather than a hardcoded year. Returns None if vswhere is
+    missing, returns no install, or the install lacks vcvars64.bat.
+    """
+    vswhere = Path(VS_INSTALLER_DIR) / "vswhere.exe"
+    if not vswhere.exists():
+        return None
+    try:
+        out = subprocess.check_output(
+            [
+                str(vswhere), "-latest", "-prerelease", "-format", "json",
+                "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+                "-property", "installationPath",
+            ],
+            text=True, stderr=subprocess.DEVNULL, timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    # vswhere with -property emits one path per line, not JSON, but with
+    # -format json it emits a JSON array of objects. Handle both.
+    out = out.strip()
+    install_path: str | None = None
+    if out.startswith("["):
+        try:
+            data = json.loads(out)
+            if data and isinstance(data, list):
+                install_path = data[0].get("installationPath")
+        except (ValueError, AttributeError, IndexError):
+            install_path = None
+    elif out:
+        install_path = out.splitlines()[0].strip()
+    if not install_path:
+        return None
+    candidate = Path(install_path) / "VC" / "Auxiliary" / "Build" / "vcvars64.bat"
+    return str(candidate) if candidate.exists() else None
+
+
 def _find_vcvars() -> str:
     env = os.environ.get("VLLM_WINDOWS_VCVARS")
     if env and Path(env).exists():
         return env
+    found = _vswhere_vcvars()
+    if found:
+        return found
+    # Fallback: probe the well-known VS 2022 install locations directly.
+    # Only used when vswhere is missing or returns no result. Year-numbered
+    # paths bake in a release schedule that bites every time Microsoft
+    # ships a new version (VS 2026 = version 18 lives under \2026\, not
+    # \2022\), so vswhere is preferred.
     candidates = [
         r"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat",
         r"C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvars64.bat",
@@ -83,17 +141,10 @@ def _find_vcvars() -> str:
     for p in candidates:
         if Path(p).exists():
             return p
-    return candidates[2]  # community is the most common — return so caller can warn
+    return candidates[2]  # community is the most common, return so caller can warn
 
 
 VCVARS = _find_vcvars()
-
-# vswhere.exe lives under the VS Installer dir, NOT on PATH by default.
-# vcvars64.bat shells out to vswhere.exe with no path qualifier, so without
-# this prefix the snapshot logs start with a scary
-# `'vswhere.exe' is not recognized as an internal or external command` line
-# even though vcvars then falls through to a working VS install.
-VS_INSTALLER_DIR = r"C:\Program Files (x86)\Microsoft Visual Studio\Installer"
 
 
 def _count_visible_gpus() -> int:
