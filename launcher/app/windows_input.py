@@ -80,6 +80,17 @@ def _classify(ch: str) -> int:
 class WindowsInput(Input):
     """Input widget with Windows-style text editing shortcuts and mouse."""
 
+    # Opt out of Textual's screen-level "drag to highlight text across widgets"
+    # mechanism. The Input has its own internal selection model (``self.selection``
+    # backing the caret + selected range), which is what Ctrl+A / double-click /
+    # triple-click need to talk to. Leaving ``ALLOW_SELECT`` at the inherited
+    # default of True causes ``Widget._on_click`` (widget.py:4693) to fire
+    # ``select_container.text_select_all()`` on a chain==3 click, which
+    # highlights every sibling in the nearest scrollable ancestor — labels,
+    # other Input fields, the whole row. Disabling it confines triple-click to
+    # the input's own contents, which is what users expect.
+    ALLOW_SELECT: ClassVar[bool] = False
+
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("ctrl+a", "select_all", "Select all", show=False),
         Binding("home", "home", "Go to start", show=False),
