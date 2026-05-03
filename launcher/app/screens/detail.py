@@ -152,10 +152,20 @@ class DetailScreen(Screen):
         padding: 0 2;
         text-style: bold;
         height: 1;
+        content-align: left middle;
     }
     #status-banner.idle    { background: #161b22; color: #8b949e; border-left: thick #30363d; }
-    #status-banner.loading { background: #2d220a; color: #d29922; border-left: thick #d29922; }
     #status-banner.running { background: #11202f; color: #3fb950; border-left: thick #3fb950; }
+    /* Loading is the state users complain about missing — make it impossible
+       to overlook: tall block, bold amber text, thick border on both sides. */
+    #status-banner.loading {
+        background: #2d220a;
+        color: #ffbb47;
+        border: thick #d29922;
+        height: 7;
+        padding: 1 3;
+        text-style: bold;
+    }
     """
 
     BINDINGS = [
@@ -247,8 +257,12 @@ class DetailScreen(Screen):
             unload_btn.disabled = False
             test_btn.disabled = False
         elif state == "loading":
-            banner.update(f"  ◐ LOADING — vLLM is starting on port {cfg.port}, "
-                          f"this can take 60-120s (kernels + weights)...")
+            banner.update(
+                f"[b #ffbb47]⏳  LOADING vLLM on port {cfg.port}...[/]\n"
+                f"[#d29922]This takes 60-120 seconds — compiling kernels + loading weights.[/]\n"
+                f"[#8b949e]The new console window shows live progress. "
+                f"Buttons re-enable once /v1/models responds.[/]"
+            )
             banner.set_classes("loading")
             # In-flight → no actions allowed (Back still works via Esc).
             load_btn.disabled = True
