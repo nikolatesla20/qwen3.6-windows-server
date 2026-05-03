@@ -69,6 +69,15 @@ KV, FlashInfer, and a few Genesis patches are unavailable. What remains:
    835 tok/s, decode within noise on the ~25 k-token bench prompt). The 32 k
    conservatism is a copy-from-Linux artifact, not a hardware limit.
 
+   **Easiest path: clone an existing snapshot and bump the context.** Press
+   `e` on the dashboard, Duplicate the closest match (e.g. `gpu0_50k` or
+   `start_speed`), edit the Context field, Save. The launcher rewrites
+   both `configs.yaml` and `start_<id>.py` for you. If you push past what
+   fits, vLLM raises a clear `ValueError` at boot before any model weights
+   load and prints the safe ceiling (see the OOM oracle below). Nothing
+   gets corrupted, just relaunch with a smaller value. See
+   [`docs/SNAPSHOTS.md`](SNAPSHOTS.md) for the full editor reference.
+
 2. **GPU1 mem-util ceiling is 0.948** (display-free). When GPU0 is idle,
    vLLM sees free=22.76/24 GiB on GPU1 *after* CUDA context init reserves
    ~1.5 GiB. 0.948 passes; 0.95 trips by ~40 MiB. The 0.92 → 0.94 → 0.948
@@ -78,13 +87,31 @@ KV, FlashInfer, and a few Genesis patches are unavailable. What remains:
    complete`). If you can't boot-quiet, stay at 0.92 max, that's the
    `start_gpu0_50k` path.
 
-3. **Use vLLM's auto-profiler as a context oracle.** Set
-   `--max-model-len=200000` (deliberately too high) and read the engine's
-   ```
-   ValueError: ... estimated maximum model length is N
-   ```
-   line. That's the exact ceiling for the current config. Push max-model-len
-   to ~99 % of N. Wrapped as a tool: `python windows_tools\probe_max_ctx.py`.
+3. **Use vLLM's auto-profiler as a context oracle.** Two ways:
+
+   a. **OOM probe.** Set `--max-model-len=200000` (deliberately too high)
+      and read the engine's
+      ```
+      ValueError: To serve at least one request with the models's max seq len
+      (200000), (X GiB KV cache is needed, which is larger than the available
+      KV cache memory (Y GiB). Based on the available memory, the estimated
+      maximum model length is N. ...
+      ```
+      That's the exact ceiling for the current config. Push max-model-len to
+      ~99 % of N. Wrapped as a tool: `python windows_tools\probe_max_ctx.py`.
+      Source: `vllm/v1/core/kv_cache_utils.py:641`.
+
+   b. **Headroom from a successful boot.** When a snapshot boots cleanly,
+      vLLM logs (`vllm/v1/core/kv_cache_utils.py:1319 / :1325`):
+      ```
+      INFO ... GPU KV cache size: N tokens
+      INFO ... Maximum concurrency for X tokens per request: Y.YYx
+      ```
+      `Y` is the multiplier of unused KV. If a 90 k snapshot reports
+      concurrency 1.5x, you have ~50 % headroom and could push ctx to
+      ~135 k (`X * Y`) without re-probing. Trust the `Maximum concurrency`
+      line, not the `GPU KV cache size` (the latter is a derived ceiling on
+      this wheel, not the physical pool).
 
 4. **PP=2** when you need >121 k. ~2× the KV pool but kills MTP, capping
    decode at ~43 tok/s. Use [`start_pp2_160k`](../snapshots/start_pp2_160k.bat)
@@ -96,19 +123,22 @@ KV, FlashInfer, and a few Genesis patches are unavailable. What remains:
 
 ## Reading the KV pool from logs
 
-After a successful boot, two lines in `logs\vllm_server.<port>.log` matter:
+Quick reference for the two oracle log lines (full discussion in Context
+item 3 above). After a successful boot, in `logs\vllm_server.<port>.log`:
 
 ```
 INFO ... [kv_cache_utils.py:1319] GPU KV cache size: N tokens
-INFO ... [kv_cache_utils.py:1324] Maximum concurrency for X tokens per request: Y.YYx
+INFO ... [kv_cache_utils.py:1325] Maximum concurrency for X tokens per request: Y.YYx
 ```
 
-The "concurrency" factor is the real pool size: `physical_pool ≈ X × Y`.
-The "GPU KV cache size: N tokens" line is *not* the pool size on this
-wheel, it's a derived ceiling. Trust the `Maximum concurrency` line.
+`safe_max_ctx ≈ X × Y`. The `GPU KV cache size: N tokens` line is *not*
+the physical pool on this wheel, it's a derived ceiling. Trust the
+`Maximum concurrency` line.
 
-When ctx is too high you instead get the `estimated maximum model length`
-error described above, read it, set max-model-len just under, re-launch.
+When ctx is too high, vLLM raises the `estimated maximum model length is N`
+ValueError before any weights load. Read N, set `--max-model-len` just
+under, re-launch. The CRUD editor (press `e` on the dashboard) is the
+fastest way to apply the new value.
 
 ## Sweeping your own configs
 

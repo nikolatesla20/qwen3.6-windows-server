@@ -142,7 +142,7 @@ change between configs. This is the full set:
 | TP / PP | .py | Tensor / pipeline parallel. TP=2 is unusable on Windows (~7 tok/s). |
 | GPU mem-util | .py (`GPU_MEM_UTIL`) | 0.92 is conservative for a card with the display attached, 0.948 is the boot-quiet ceiling. |
 | MTP n | .py (`USE_MTP` + `NUM_SPEC_TOKENS`) | Blank disables spec-decode. |
-| Context | .py (`CTX`) | Tokens. The probe tool finds the ceiling for a given mem-util. |
+| Context | .py (`CTX`) | Tokens. If you push past what the KV pool can hold, vLLM raises `ValueError: ... estimated maximum model length is N` at boot before any weights load. Read N from the error and re-save. See [`docs/TUNING.md`](TUNING.md#context) for the OOM-oracle and the headroom-from-successful-boot pattern. |
 | Decode tok/s | yaml | Measured number you've validated. |
 | Prefill tok/s cold | yaml | Cold-cache prefill, optional. |
 | Power cap | yaml | Watts, optional. |
