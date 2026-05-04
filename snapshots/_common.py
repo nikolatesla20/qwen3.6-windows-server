@@ -163,29 +163,63 @@ def _count_visible_gpus() -> int:
     return sum(1 for line in out.splitlines() if line.strip())
 
 
-def resolve_cuda_visible_devices(preferred_single: str, world_size: int) -> str:
+def print_insufficient_gpus_banner(wanted: int, visible: int) -> None:
+    """Loud banner for the multi-GPU-snapshot-on-single-GPU-box case.
+
+    Mirrors ``print_port_collision_banner`` so all hard-fail-before-vLLM
+    paths share one visual style. Without this, ``CUDA_VISIBLE_DEVICES=0,1``
+    on a 1-GPU host crashes vLLM ~30 s into boot with an opaque
+    ``invalid device ordinal`` traceback that's easy to misread as a
+    driver problem.
+    """
+    bar = "=" * 60
+    print("", flush=True)
+    print(bar, flush=True)
+    print(f"  THIS SNAPSHOT NEEDS {wanted} GPUs, BUT ONLY {visible} IS VISIBLE", flush=True)
+    print(bar, flush=True)
+    print("  Multi-GPU snapshots (PP=2 / TP=2) require two NVIDIA GPUs.", flush=True)
+    print("  On a single-GPU box, pick one of the single-GPU snapshots", flush=True)
+    print("  from the launcher dashboard instead — for example:", flush=True)
+    print("    start_speed   (64 tok/s @ 90k ctx,  MTP n=6)", flush=True)
+    print("    start_127k    (53 tok/s @ 127k ctx, MTP n=3)", flush=True)
+    print("    start_gpu0_50k (GPU 0 only, conservative defaults)", flush=True)
+    print("  Or edit this snapshot's TP/PP via Edit Snapshots (E) in", flush=True)
+    print("  the launcher.", flush=True)
+    print(bar, flush=True)
+
+
+def resolve_cuda_visible_devices(preferred_single: str, world_size: int) -> str | None:
     """Pick CUDA_VISIBLE_DEVICES with a one-GPU fallback.
 
     The 2× 3090 snapshots default to pinning the single-card path to GPU 1
     so GPU 0 stays free for the display compositor and other work. On a
     single-GPU box (or any host where nvidia-smi reports fewer GPUs than
     the snapshot expects), that pin is wrong and vLLM dies with no useful
-    error. Detect that case and fall back to GPU 0 with a loud log line.
+    error.
+
+    Single-GPU snapshots fall back to GPU 0 (with an info note about the
+    mem_util ceiling that GPU 0 + display attached implies). Multi-GPU
+    snapshots have no graceful fallback — print the banner and return
+    ``None`` so the caller bails before launching vLLM.
 
     Args:
         preferred_single: ``CUDA_VISIBLE_DEVICES`` value the snapshot
             wants when running TP=PP=1 (usually ``"1"`` or ``"0"``).
         world_size: TP * PP. Multi-GPU snapshots want ``"0,1"``.
+
+    Returns:
+        The resolved ``CUDA_VISIBLE_DEVICES`` string, or ``None`` when
+        the snapshot needs more GPUs than the host has. Callers must
+        treat ``None`` as a hard exit (banner has already been printed,
+        and an ``input()`` pause held the WT tab open).
     """
     visible = _count_visible_gpus()
     if world_size > 1:
         if visible and visible < world_size:
-            print(
-                f"[warn] snapshot wants {world_size} GPUs but nvidia-smi "
-                f"reports {visible}. Pick a single-GPU snapshot "
-                f"(start_72tps / start_gpu0_50k) instead.",
-                file=sys.stderr,
-            )
+            print_insufficient_gpus_banner(world_size, visible)
+            try: input("Press Enter to close...")
+            except EOFError: pass
+            return None
         return ",".join(str(i) for i in range(max(world_size, 1)))
     try:
         wanted_idx = int(preferred_single.split(",")[0])
@@ -193,9 +227,12 @@ def resolve_cuda_visible_devices(preferred_single: str, world_size: int) -> str:
         wanted_idx = 0
     if visible and wanted_idx >= visible:
         print(
-            f"[warn] snapshot prefers GPU {wanted_idx} but only {visible} "
-            f"GPU(s) visible — falling back to GPU 0. For dedicated "
-            f"single-GPU tuning see start_gpu0_50k.",
+            f"[info] snapshot prefers GPU {wanted_idx} but only {visible} "
+            f"GPU(s) visible — falling back to GPU 0. If GPU 0 has a "
+            f"display attached, the safety check may trip on "
+            f"--gpu-memory-utilization >= 0.95; lower to 0.92 via the "
+            f"launcher's Edit Snapshots screen if you see "
+            f"'Free memory on device cuda:0 ... is less than desired'.",
             file=sys.stderr,
         )
         return "0"

@@ -89,7 +89,10 @@ def main() -> int:
     _world = TP * PP
     # GPU1 only when single-card (leaves GPU0 free for display/other work);
     # both cards when TP/PP > 1.
-    env["CUDA_VISIBLE_DEVICES"] = resolve_cuda_visible_devices("0", _world)
+    _cvd = resolve_cuda_visible_devices("0", _world)
+    if _cvd is None:
+        return 1
+    env["CUDA_VISIBLE_DEVICES"] = _cvd
     env["VLLM_SLEEP_WHEN_IDLE"] = "1"
     env["VLLM_ENABLE_CUDAGRAPH_GC"] = "1"
     env["VLLM_ALLOW_LONG_MAX_MODEL_LEN"] = "1"
