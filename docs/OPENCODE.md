@@ -16,7 +16,7 @@ The bundled vLLM wheel serves API endpoints that OpenCode can talk to without pr
 2. If you have freshly installed OpenCode, then launch it once first to get the local directories 
    to be created, and then make an 'opencode.json' file in that directory
    
-   The directory is located at `~/.config/opencode/opencode.json` (or `%USERPROFILE%\.config\opencode\opencode.json`
+   The file needs to be located at `~/.config/opencode/opencode.json` (or `%USERPROFILE%\.config\opencode\opencode.json`
    on Windows): 
 
    Then put these contents into the opencode.json file:
