@@ -49,7 +49,7 @@ The bundled vLLM wheel serves API endpoints that OpenCode can talk to without pr
 
 3. Run `Opencode` in your project. It shiould hit your local server.
 
-4. I highly recommend also adding an AGENTS.MD file in the same directory, with instructions to help OpenCode with tool calling. The instructions are.
+4. I highly recommend also adding an AGENTS.MD file in the same directory ("~/.config/opencode"), with instructions to help OpenCode with tool calling. The instructions are:
 ```
 "I am on Windows operating system. When creating or editing files, ALWAYS use double backslashes (e.g., C:\\path\\to\\file) in your tool calls. Do not use forward slashes or single backslashes"
 ```
