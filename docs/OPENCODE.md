@@ -45,7 +45,7 @@ The bundled vLLM wheel serves API endpoints that OpenCode can talk to without pr
 	  },
 	  "model": "vllm-local/your-vllm-model-name"
 	}
-```
+	```
 
 3. Run `Opencode` in your project. It shiould hit your local server.
 
