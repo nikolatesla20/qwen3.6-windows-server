@@ -13,16 +13,13 @@ The bundled vLLM wheel serves API endpoints that OpenCode can talk to without pr
 
    Wait until the log shows `Application startup complete.`
 
-2. Point OpenCode at the server. Easiest is to put this in
-   `~/.config/opencode/opencode.json` (or `%USERPROFILE%\.config\opencode\opencode.json`
+2. If you have freshly installed OpenCode, then launch it once first to get the local directories 
+   to be created, and then make an 'opencode.json' file in that directory
+   
+   The directory is located at `~/.config/opencode/opencode.json` (or `%USERPROFILE%\.config\opencode\opencode.json`
    on Windows): 
 
-   If you have freshly installed OpenCode, then launch it once before this to get the 
-   folders to be present, and then make an 'opencode.json' file in that directory
-
-   Add / Create the opencode.json file if it's not already there
-
-   Put these contents into the json file:
+   Then put these contents into the opencode.json file:
 
    ```json
    {
