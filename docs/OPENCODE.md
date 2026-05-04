@@ -22,30 +22,30 @@ The bundled vLLM wheel serves API endpoints that OpenCode can talk to without pr
    Then put these contents into the opencode.json file:
 
    ```json
-   {
-  "$schema": "https://opencode.ai/config.json",
-  "provider": {
-    "vllm-local": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "Local vLLM",
-      "options": {
-        "baseURL": "http://localhost:5001/v1",
-        "apiKey": "sk-no-key-required"
-      },
-      "models": {
-        "your-vllm-model-name": {
-          "name": "Local Qwen3",
-		   "limit": {
-            "context": 90000,
-            "output": 8192
-		   }
-        }
-      }
-    }
-  },
-  "model": "vllm-local/your-vllm-model-name"
-}
-   ```
+	   {
+	  "$schema": "https://opencode.ai/config.json",
+	  "provider": {
+	    "vllm-local": {
+	      "npm": "@ai-sdk/openai-compatible",
+	      "name": "Local vLLM",
+	      "options": {
+	        "baseURL": "http://localhost:5001/v1",
+	        "apiKey": "sk-no-key-required"
+	      },
+	      "models": {
+	        "your-vllm-model-name": {
+	          "name": "Local Qwen3",
+			   "limit": {
+	            "context": 90000,
+	            "output": 8192
+			   }
+	        }
+	      }
+	    }
+	  },
+	  "model": "vllm-local/your-vllm-model-name"
+	}
+```
 
 
 3. Run `Opencode` in your project. It shiould hit your local server.
