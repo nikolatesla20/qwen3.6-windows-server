@@ -47,7 +47,7 @@ The bundled vLLM wheel serves API endpoints that OpenCode can talk to without pr
 	}
 	```
 
-3. Run `Opencode` in your project. It shiould hit your local server.
+3. Run `Opencode` in your project. It should hit your local server. If you don't see it connect right away then use OpenCode's "/connect" feature to choose the "Local vLMM" option. If it asks for a API key you can just enter a blank key or skip.
 
 4. I highly recommend also adding an AGENTS.MD file in the same directory ("~/.config/opencode"), with instructions to help OpenCode with tool calling. The instructions are:
 ```
